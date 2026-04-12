@@ -18,7 +18,7 @@ export default function SplashScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.enterButton}
           activeOpacity={0.85}
-          onPress={() => navigation.navigate('Login')}
+          onPress={() => navigation.navigate('Home')}
         >
           <Text style={styles.enterButtonText}>Entrar al Mercado</Text>
           <Text style={styles.arrow}>→</Text>
@@ -26,7 +26,7 @@ export default function SplashScreen({ navigation }: Props) {
 
         <Pressable
           style={({ pressed }) => [styles.operativeLinkWrapper, pressed && { opacity: 0.6 }]}
-          onPress={() => navigation.navigate('RoleSelection')}
+          onPress={() => navigation.navigate('Login')}
         >
           <Text style={styles.operativeLink}>Acceso para personal operativo</Text>
         </Pressable>
