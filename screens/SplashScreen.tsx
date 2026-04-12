@@ -18,7 +18,7 @@ export default function SplashScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.enterButton}
           activeOpacity={0.85}
-          onPress={() => navigation.navigate('Home')}
+          onPress={() => navigation.navigate('MainTabs')}
         >
           <Text style={styles.enterButtonText}>Entrar al Mercado</Text>
           <Text style={styles.arrow}>→</Text>
