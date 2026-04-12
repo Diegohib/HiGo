@@ -2,6 +2,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { HomeStackParamList } from './types';
 import HomeScreen from '../screens/HomeScreen';
 import CatalogScreen from '../screens/CatalogScreen';
+import ProductScreen from '../screens/ProductScreen';
 
 const Stack = createStackNavigator<HomeStackParamList>();
 
@@ -15,15 +16,16 @@ export default function HomeStack() {
         headerBackTitleVisible: false,
       }}
     >
-      <Stack.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="Catalog"
         component={CatalogScreen}
         options={({ route }) => ({ title: route.params.categoryName })}
+      />
+      <Stack.Screen
+        name="Product"
+        component={ProductScreen}
+        options={{ title: '' }}
       />
     </Stack.Navigator>
   );

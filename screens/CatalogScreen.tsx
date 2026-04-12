@@ -1,159 +1,128 @@
-import { useState } from 'react';
 import {
   StyleSheet,
   Text,
   View,
-  ScrollView,
   TextInput,
   TouchableOpacity,
   FlatList,
-  Image,
+  ScrollView,
 } from 'react-native';
+import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import { HomeStackParamList } from '../navigation/types';
+import { PRODUCTS, Product } from '../data/products';
 
 type Props = {
   navigation: StackNavigationProp<HomeStackParamList, 'Catalog'>;
   route: RouteProp<HomeStackParamList, 'Catalog'>;
 };
 
-const SUBCATEGORIES = ['Todos', 'Frescos', 'Orgánicos', 'Importados', 'A granel'];
+export default function CatalogScreen({ navigation, route }: Props) {
+  const { categoryId } = route.params;
+  const [search, setSearch] = useState('');
 
-const PRODUCTS = [
-  {
-    id: '1',
-    name: 'Tomate Riñón',
-    category: 'Verduras',
-    puesto: 'Puesto #12 — Mercado Central',
-    price: 0.80,
-    unit: 'kg',
-    image: 'https://via.placeholder.com/80/388E3C/FFFFFF?text=🍅',
-  },
-  {
-    id: '2',
-    name: 'Papa Chola',
-    category: 'Tubérculos',
-    puesto: 'Puesto #5 — Mercado Norte',
-    price: 0.50,
-    unit: 'kg',
-    image: 'https://via.placeholder.com/80/8B6914/FFFFFF?text=🥔',
-  },
-  {
-    id: '3',
-    name: 'Cebolla Paiteña',
-    category: 'Verduras',
-    puesto: 'Puesto #8 — Mercado Central',
-    price: 0.60,
-    unit: 'kg',
-    image: 'https://via.placeholder.com/80/C4623A/FFFFFF?text=🧅',
-  },
-  {
-    id: '4',
-    name: 'Zanahoria',
-    category: 'Hortalizas',
-    puesto: 'Puesto #3 — Mercado Sur',
-    price: 0.40,
-    unit: 'kg',
-    image: 'https://via.placeholder.com/80/C4943A/FFFFFF?text=🥕',
-  },
-];
+  const products = PRODUCTS.filter(p => {
+    const matchesCategory = p.categoryId === categoryId;
+    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
+    return matchesCategory && (search === '' || matchesSearch);
+  });
 
-export default function CatalogScreen({ route }: Props) {
-  const { categoryName } = route.params;
+  // Subcategorías únicas de esta categoría
+  const subcats = ['Todos', ...Array.from(new Set(products.map(p => p.subcategory)))];
   const [activeSubcat, setActiveSubcat] = useState(0);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  function increment(id: string) {
-    setQuantities(prev => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
-  }
+  const filtered = activeSubcat === 0
+    ? products
+    : products.filter(p => p.subcategory === subcats[activeSubcat]);
 
-  function decrement(id: string) {
-    setQuantities(prev => {
-      const next = (prev[id] ?? 0) - 1;
-      if (next <= 0) {
-        const copy = { ...prev };
-        delete copy[id];
-        return copy;
-      }
-      return { ...prev, [id]: next };
-    });
+  function renderProduct({ item }: { item: Product }) {
+    const basePrice = item.presentations[0];
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate('Product', { productId: item.id })}
+      >
+        {/* Imagen placeholder */}
+        <View style={[styles.imagePlaceholder, { backgroundColor: item.emojiColor }]}>
+          <Text style={styles.imageEmoji}>{item.emoji}</Text>
+        </View>
+
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName}>{item.name}</Text>
+          <Text style={styles.cardSubcat}>{item.subcategory}</Text>
+          <Text style={styles.cardPrice}>
+            ${basePrice.price.toFixed(2)}
+            <Text style={styles.cardUnit}> / {basePrice.label}</Text>
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.addBtn}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Product', { productId: item.id })}
+        >
+          <Ionicons name="add" size={22} color="#3D1F8B" />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
   }
 
   return (
     <View style={styles.container}>
-
       {/* ── Búsqueda ── */}
       <View style={styles.searchWrapper}>
         <Ionicons name="search-outline" size={18} color="#9B8EC4" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar tomates, papas, cebollas..."
+          placeholder="Buscar productos..."
           placeholderTextColor="#9B8EC4"
+          value={search}
+          onChangeText={setSearch}
         />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Ionicons name="close-circle" size={18} color="#9B8EC4" />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* ── Pills de subcategorías ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.pillsRow}
-      >
-        {SUBCATEGORIES.map((sub, i) => (
-          <TouchableOpacity
-            key={sub}
-            style={[styles.pill, activeSubcat === i && styles.pillActive]}
-            onPress={() => setActiveSubcat(i)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.pillText, activeSubcat === i && styles.pillTextActive]}>
-              {sub}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* ── Pills subcategorías ── */}
+      {subcats.length > 2 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pillsRow}
+        >
+          {subcats.map((sub, i) => (
+            <TouchableOpacity
+              key={sub}
+              style={[styles.pill, activeSubcat === i && styles.pillActive]}
+              onPress={() => setActiveSubcat(i)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.pillText, activeSubcat === i && styles.pillTextActive]}>
+                {sub}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {/* ── Lista de productos ── */}
       <FlatList
-        data={PRODUCTS}
+        data={filtered}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.productList}
+        contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => {
-          const qty = quantities[item.id] ?? 0;
-          return (
-            <View style={styles.productCard}>
-              <Image
-                source={{ uri: item.image }}
-                style={styles.productImage}
-                resizeMode="cover"
-              />
-              <View style={styles.productInfo}>
-                <Text style={styles.productName}>{item.name}</Text>
-                <Text style={styles.productMeta}>{item.category}</Text>
-                <Text style={styles.productPuesto} numberOfLines={1}>{item.puesto}</Text>
-                <Text style={styles.productPrice}>
-                  ${item.price.toFixed(2)}
-                  <Text style={styles.productUnit}> / {item.unit}</Text>
-                </Text>
-              </View>
-              <View style={styles.qtyControl}>
-                {qty > 0 ? (
-                  <>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => decrement(item.id)}>
-                      <Ionicons name="remove" size={16} color="#3D1F8B" />
-                    </TouchableOpacity>
-                    <Text style={styles.qtyText}>{qty}</Text>
-                  </>
-                ) : null}
-                <TouchableOpacity style={styles.addBtn} onPress={() => increment(item.id)}>
-                  <Ionicons name="add" size={20} color="#3D1F8B" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        }}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>No se encontraron productos</Text>
+          </View>
+        }
+        renderItem={renderProduct}
       />
     </View>
   );
@@ -179,9 +148,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0D9F5',
   },
-  searchIcon: {
-    marginRight: 8,
-  },
+  searchIcon: { marginRight: 8 },
   searchInput: {
     flex: 1,
     fontSize: 14,
@@ -191,7 +158,7 @@ const styles = StyleSheet.create({
   // Pills
   pillsRow: {
     paddingHorizontal: 18,
-    paddingBottom: 14,
+    paddingBottom: 12,
     gap: 8,
   },
   pill: {
@@ -213,86 +180,77 @@ const styles = StyleSheet.create({
   },
 
   // Lista
-  productList: {
+  list: {
     paddingHorizontal: 18,
     paddingBottom: 32,
     gap: 12,
   },
 
-  // Tarjeta de producto
-  productCard: {
+  // Tarjeta
+  card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    gap: 12,
+    gap: 14,
     shadowColor: '#3D1F8B',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
     shadowRadius: 6,
     elevation: 2,
   },
-  productImage: {
+  imagePlaceholder: {
     width: 72,
     height: 72,
     borderRadius: 12,
-    backgroundColor: '#F0EEFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  productInfo: {
+  imageEmoji: {
+    fontSize: 36,
+  },
+  cardInfo: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
-  productName: {
+  cardName: {
     fontSize: 15,
     fontWeight: '700',
     color: '#1A1A1A',
   },
-  productMeta: {
+  cardSubcat: {
     fontSize: 12,
     color: '#9B8EC4',
     fontWeight: '600',
   },
-  productPuesto: {
-    fontSize: 11,
-    color: '#AAAAAA',
-  },
-  productPrice: {
+  cardPrice: {
     fontSize: 16,
     fontWeight: '800',
     color: '#2ECC71',
     marginTop: 4,
   },
-  productUnit: {
+  cardUnit: {
     fontSize: 12,
     fontWeight: '400',
     color: '#9B8EC4',
   },
-
-  // Control de cantidad
-  qtyControl: {
-    alignItems: 'center',
-    gap: 6,
-  },
   addBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     backgroundColor: '#EDE7F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qtyBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#F0EEFF',
+
+  // Empty
+  empty: {
+    paddingTop: 60,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  qtyText: {
+  emptyText: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#3D1F8B',
+    color: '#9B8EC4',
   },
 });

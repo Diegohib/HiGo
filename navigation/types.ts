@@ -8,7 +8,13 @@ export type RootStackParamList = {
 
 export type HomeStackParamList = {
   Home: undefined;
-  Catalog: { categoryName: string; categoryEmoji: string };
+  Catalog: {
+    categoryId: string;
+    categoryName: string;
+    categoryEmoji: string;
+    categoryColor: string;
+  };
+  Product: { productId: string };
 };
 
 export type TabParamList = {

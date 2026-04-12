@@ -11,19 +11,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HomeStackParamList } from '../navigation/types';
+import { CATEGORIES } from '../data/products';
 
 type Props = {
   navigation: StackNavigationProp<HomeStackParamList, 'Home'>;
 };
-
-const CATEGORIES = [
-  { id: '1', name: 'Tubérculos', emoji: '🥔', bg: '#8B6914' },
-  { id: '2', name: 'Frutas',     emoji: '🍎', bg: '#2D7A3A' },
-  { id: '3', name: 'Verduras',   emoji: '🥦', bg: '#388E3C' },
-  { id: '4', name: 'Arroz',      emoji: '🍚', bg: '#C4943A' },
-  { id: '5', name: 'Azúcar',     emoji: '🍬', bg: '#C4623A' },
-  { id: '6', name: 'Huevos',     emoji: '🥚', bg: '#F57F17' },
-];
 
 export default function HomeScreen({ navigation }: Props) {
   return (
@@ -60,11 +52,13 @@ export default function HomeScreen({ navigation }: Props) {
           {CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat.id}
-              style={[styles.categoryCard, { backgroundColor: cat.bg }]}
+              style={[styles.categoryCard, { backgroundColor: cat.color }]}
               activeOpacity={0.82}
               onPress={() => navigation.navigate('Catalog', {
-                categoryName: cat.name,
+                categoryId:    cat.id,
+                categoryName:  cat.name,
                 categoryEmoji: cat.emoji,
+                categoryColor: cat.color,
               })}
             >
               <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
@@ -88,8 +82,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#3D1F8B',
   },
-
-  // Header
   header: {
     backgroundColor: '#3D1F8B',
     flexDirection: 'row',
@@ -98,9 +90,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
   },
-  headerSpacer: {
-    width: 36,
-  },
+  headerSpacer: { width: 36 },
   headerTitle: {
     fontSize: 26,
     fontWeight: '800',
@@ -111,8 +101,6 @@ const styles = StyleSheet.create({
     width: 36,
     alignItems: 'flex-end',
   },
-
-  // Scroll
   scroll: {
     flex: 1,
     backgroundColor: '#F7F5FF',
@@ -124,8 +112,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 40,
   },
-
-  // Búsqueda
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -137,24 +123,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0D9F5',
   },
-  searchIcon: {
-    marginRight: 8,
-  },
+  searchIcon: { marginRight: 8 },
   searchInput: {
     flex: 1,
     fontSize: 14,
     color: '#1A1A1A',
   },
-
-  // Sección
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1A1A1A',
     marginBottom: 14,
   },
-
-  // Grid categorías 2 columnas
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -173,16 +153,12 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  categoryEmoji: {
-    fontSize: 42,
-  },
+  categoryEmoji: { fontSize: 42 },
   categoryName: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-
-  // Botón repetir pedido
   repeatButton: {
     backgroundColor: '#3D1F8B',
     flexDirection: 'row',
