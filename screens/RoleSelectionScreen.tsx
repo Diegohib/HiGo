@@ -1,9 +1,9 @@
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'RoleSelection'>;
+  navigation: StackNavigationProp<RootStackParamList, 'RoleSelection'>;
 };
 
 const roles = [

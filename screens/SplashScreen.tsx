@@ -1,9 +1,9 @@
 import { StyleSheet, Text, View, TouchableOpacity, Pressable } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Splash'>;
+  navigation: StackNavigationProp<RootStackParamList, 'Splash'>;
 };
 
 export default function SplashScreen({ navigation }: Props) {
