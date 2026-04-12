@@ -9,6 +9,12 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { HomeStackParamList } from '../navigation/types';
+
+type Props = {
+  navigation: StackNavigationProp<HomeStackParamList, 'Home'>;
+};
 
 const CATEGORIES = [
   { id: '1', name: 'Tubérculos', emoji: '🥔', bg: '#8B6914' },
@@ -19,7 +25,7 @@ const CATEGORIES = [
   { id: '6', name: 'Huevos',     emoji: '🥚', bg: '#F57F17' },
 ];
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#3D1F8B" />
@@ -56,6 +62,10 @@ export default function HomeScreen() {
               key={cat.id}
               style={[styles.categoryCard, { backgroundColor: cat.bg }]}
               activeOpacity={0.82}
+              onPress={() => navigation.navigate('Catalog', {
+                categoryName: cat.name,
+                categoryEmoji: cat.emoji,
+              })}
             >
               <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
               <Text style={styles.categoryName}>{cat.name}</Text>

@@ -8,6 +8,7 @@ export type RootStackParamList = {
 
 export type HomeStackParamList = {
   Home: undefined;
+  Catalog: { categoryName: string; categoryEmoji: string };
 };
 
 export type TabParamList = {
