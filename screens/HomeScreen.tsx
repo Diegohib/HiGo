@@ -11,16 +11,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 const CATEGORIES = [
-  { id: '1', name: 'Frutas',     emoji: '🍎', bg: '#2D7A3A' },
-  { id: '2', name: 'Verduras',   emoji: '🥦', bg: '#388E3C' },
-  { id: '3', name: 'Hortalizas', emoji: '🥕', bg: '#558B2F' },
-  { id: '4', name: 'Huevos',     emoji: '🥚', bg: '#F57F17' },
-];
-
-const OFFERS = [
-  { id: '1', name: 'Tomates perita',  unit: 'x kg',  price: '$850',  badge: '15% OFF' },
-  { id: '2', name: 'Papa blanca',     unit: 'x 10kg', price: '$4.200', badge: '10% OFF' },
-  { id: '3', name: 'Cebolla blanca',  unit: 'x kg',  price: '$620',  badge: '20% OFF' },
+  { id: '1', name: 'Tubérculos', emoji: '🥔', bg: '#8B6914' },
+  { id: '2', name: 'Frutas',     emoji: '🍎', bg: '#2D7A3A' },
+  { id: '3', name: 'Verduras',   emoji: '🥦', bg: '#388E3C' },
+  { id: '4', name: 'Arroz',      emoji: '🍚', bg: '#C4943A' },
+  { id: '5', name: 'Azúcar',     emoji: '🍬', bg: '#C4623A' },
+  { id: '6', name: 'Huevos',     emoji: '🥚', bg: '#F57F17' },
 ];
 
 export default function HomeScreen() {
@@ -42,7 +38,7 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Barra de búsqueda ── */}
+        {/* ── Búsqueda ── */}
         <View style={styles.searchWrapper}>
           <Ionicons name="search-outline" size={18} color="#9B8EC4" style={styles.searchIcon} />
           <TextInput
@@ -72,25 +68,6 @@ export default function HomeScreen() {
           <Ionicons name="time-outline" size={20} color="#FFFFFF" />
           <Text style={styles.repeatButtonText}>Repetir último pedido</Text>
         </TouchableOpacity>
-
-        {/* ── Ofertas del día ── */}
-        <Text style={styles.sectionTitle}>Ofertas del día</Text>
-        <View style={styles.offersColumn}>
-          {OFFERS.map((offer) => (
-            <TouchableOpacity key={offer.id} style={styles.offerCard} activeOpacity={0.8}>
-              <View style={styles.offerInfo}>
-                <Text style={styles.offerName}>{offer.name}</Text>
-                <Text style={styles.offerUnit}>{offer.unit}</Text>
-              </View>
-              <View style={styles.offerRight}>
-                <View style={styles.offerBadge}>
-                  <Text style={styles.offerBadgeText}>{offer.badge}</Text>
-                </View>
-                <Text style={styles.offerPrice}>{offer.price}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -135,7 +112,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 18,
     paddingTop: 20,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
 
   // Búsqueda
@@ -167,27 +144,27 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
-  // Grid categorías
+  // Grid categorías 2 columnas
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 28,
   },
   categoryCard: {
     width: '47.5%',
-    borderRadius: 16,
-    paddingVertical: 28,
+    borderRadius: 18,
+    paddingVertical: 30,
     alignItems: 'center',
     gap: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 3,
   },
   categoryEmoji: {
-    fontSize: 40,
+    fontSize: 42,
   },
   categoryName: {
     fontSize: 16,
@@ -204,7 +181,6 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 16,
     borderRadius: 14,
-    marginBottom: 28,
     shadowColor: '#3D1F8B',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
@@ -215,56 +191,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-  },
-
-  // Ofertas
-  offersColumn: {
-    gap: 12,
-  },
-  offerCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#3D1F8B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  offerInfo: {
-    gap: 4,
-  },
-  offerName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  offerUnit: {
-    fontSize: 12,
-    color: '#9B8EC4',
-  },
-  offerRight: {
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  offerBadge: {
-    backgroundColor: '#2ECC71',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  offerBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  offerPrice: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#3D1F8B',
   },
 });
