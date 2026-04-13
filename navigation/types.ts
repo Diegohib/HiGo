@@ -1,9 +1,14 @@
+export type StaffRole = 'cochero' | 'transportista' | 'comerciante';
+
 export type RootStackParamList = {
   Splash: undefined;
   MainTabs: undefined;
-  Login: undefined;
+  // Flujo cliente (checkout)
   Register: undefined;
+  // Flujo personal operativo
+  Login: undefined;
   RoleSelection: undefined;
+  StaffRegister: { role: StaffRole };
 };
 
 export type HomeStackParamList = {

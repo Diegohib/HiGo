@@ -35,9 +35,11 @@ export default function LoginScreen({ navigation }: Props) {
 
         <Pressable
           style={({ pressed }) => [styles.registerLinkWrapper, pressed && { opacity: 0.6 }]}
-          onPress={() => navigation.navigate('Register')}
+          onPress={() => navigation.navigate('RoleSelection')}
         >
-          <Text style={styles.registerLink}>¿No tenés cuenta? <Text style={styles.registerLinkBold}>Registrate</Text></Text>
+          <Text style={styles.registerLink}>
+            <Text style={styles.registerLinkBold}>Seleccioná tu rol para registrarte</Text>
+          </Text>
         </Pressable>
       </View>
     </View>

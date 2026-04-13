@@ -1,33 +1,40 @@
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/types';
+import { RootStackParamList, StaffRole } from '../navigation/types';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'RoleSelection'>;
 };
 
-const roles = [
-  { id: 'comprador', label: 'Comprador', icon: '🛒', description: 'Comprá productos al por mayor' },
-  { id: 'vendedor', label: 'Vendedor', icon: '🏪', description: 'Publicá y vendé tus productos' },
-  { id: 'repartidor', label: 'Repartidor', icon: '🚚', description: 'Gestioná entregas y logística' },
-  { id: 'operativo', label: 'Personal Operativo', icon: '⚙️', description: 'Administración del mercado' },
+const roles: { id: StaffRole; label: string; icon: string; description: string; color: string }[] = [
+  { id: 'cochero',       label: 'Cochero',       icon: '🚲', description: 'Llevo compras dentro del mercado', color: '#2D7A3A' },
+  { id: 'transportista', label: 'Transportista', icon: '🚚', description: 'Entrego pedidos en la ciudad',     color: '#8B6914' },
+  { id: 'comerciante',   label: 'Comerciante',   icon: '🏪', description: 'Vendo mis productos en el mercado', color: '#C4623A' },
 ];
 
 export default function RoleSelectionScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.logo}>HiGo</Text>
-        <Text style={styles.subtitle}>¿Cómo querés usar la app?</Text>
-        <Text style={styles.hint}>Seleccioná tu rol para continuar</Text>
+        <Text style={styles.subtitle}>¿Cuál es tu rol?</Text>
+        <Text style={styles.hint}>Seleccioná para crear tu cuenta</Text>
       </View>
 
       <View style={styles.rolesGrid}>
         {roles.map((role) => (
-          <TouchableOpacity key={role.id} style={styles.roleCard} activeOpacity={0.8}>
-            <Text style={styles.roleIcon}>{role.icon}</Text>
-            <Text style={styles.roleLabel}>{role.label}</Text>
-            <Text style={styles.roleDescription}>{role.description}</Text>
+          <TouchableOpacity
+            key={role.id}
+            style={[styles.roleCard, { borderColor: role.color }]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('StaffRegister', { role: role.id })}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: role.color }]}>
+              <Text style={styles.roleIcon}>{role.icon}</Text>
+            </View>
+            <View style={styles.roleText}>
+              <Text style={styles.roleLabel}>{role.label}</Text>
+              <Text style={styles.roleDescription}>{role.description}</Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -40,19 +47,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#3D1F8B',
     paddingHorizontal: 24,
-    paddingTop: 80,
+    paddingTop: 32,
     paddingBottom: 40,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
-  },
-  logo: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 2,
-    marginBottom: 8,
+    marginBottom: 32,
   },
   subtitle: {
     fontSize: 20,
@@ -66,35 +66,41 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   rolesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    justifyContent: 'center',
+    gap: 14,
   },
   roleCard: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.10)',
     borderRadius: 16,
-    padding: 24,
-    width: '45%',
+    padding: 18,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    gap: 16,
+    borderWidth: 1.5,
+  },
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   roleIcon: {
-    fontSize: 36,
+    fontSize: 28,
+  },
+  roleText: {
+    flex: 1,
+    gap: 3,
   },
   roleLabel: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#FFFFFF',
-    textAlign: 'center',
   },
   roleDescription: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#FFFFFF',
     opacity: 0.7,
-    textAlign: 'center',
     lineHeight: 18,
   },
 });
