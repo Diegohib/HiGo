@@ -12,12 +12,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HomeStackParamList } from '../navigation/types';
 import { CATEGORIES } from '../data/products';
+import { useCartStore } from '../store/cartStore';
 
 type Props = {
   navigation: StackNavigationProp<HomeStackParamList, 'Home'>;
 };
 
 export default function HomeScreen({ navigation }: Props) {
+  const totalItems = useCartStore(s => s.totalItems);
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#3D1F8B" />
@@ -26,8 +29,17 @@ export default function HomeScreen({ navigation }: Props) {
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
         <Text style={styles.headerTitle}>HiGo</Text>
-        <TouchableOpacity style={styles.cartButton} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.cartButton}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Carrito')}
+        >
           <Ionicons name="cart-outline" size={26} color="#FFFFFF" />
+          {totalItems > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{totalItems > 99 ? '99+' : totalItems}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -100,6 +112,25 @@ const styles = StyleSheet.create({
   cartButton: {
     width: 36,
     alignItems: 'flex-end',
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#E74C3C',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#3D1F8B',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
   scroll: {
     flex: 1,

@@ -3,6 +3,7 @@ import { HomeStackParamList } from './types';
 import HomeScreen from '../screens/HomeScreen';
 import CatalogScreen from '../screens/CatalogScreen';
 import ProductScreen from '../screens/ProductScreen';
+import CarritoScreen from '../screens/CarritoScreen';
 
 const Stack = createStackNavigator<HomeStackParamList>();
 
@@ -20,12 +21,17 @@ export default function HomeStack() {
       <Stack.Screen
         name="Catalog"
         component={CatalogScreen}
-        options={({ route }) => ({ title: route.params.categoryName })}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="Product"
         component={ProductScreen}
         options={{ title: '' }}
+      />
+      <Stack.Screen
+        name="Carrito"
+        component={CarritoScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

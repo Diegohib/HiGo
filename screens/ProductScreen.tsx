@@ -6,28 +6,49 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HomeStackParamList } from '../navigation/types';
 import { PRODUCTS } from '../data/products';
+import { useCartStore } from '../store/cartStore';
 
 type Props = {
   navigation: StackNavigationProp<HomeStackParamList, 'Product'>;
   route: RouteProp<HomeStackParamList, 'Product'>;
 };
 
-export default function ProductScreen({ route }: Props) {
+export default function ProductScreen({ navigation, route }: Props) {
   const product = PRODUCTS.find(p => p.id === route.params.productId)!;
   const [selectedPresentation, setSelectedPresentation] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const addItem = useCartStore(s => s.addItem);
 
   const currentPresentation = product.presentations[selectedPresentation];
   const totalPrice = (currentPresentation.price * quantity).toFixed(2);
 
   function increment() { setQuantity(q => q + 1); }
   function decrement() { setQuantity(q => Math.max(1, q - 1)); }
+
+  function handleAddToCart() {
+    addItem({
+      productId: product.id,
+      presentationIndex: selectedPresentation,
+      presentationLabel: currentPresentation.label,
+      presentationPrice: currentPresentation.price,
+      quantity,
+    });
+    Alert.alert(
+      'Agregado al carrito',
+      `${product.name} (${currentPresentation.label}) x${quantity}`,
+      [
+        { text: 'Seguir comprando', style: 'cancel' },
+        { text: 'Ver carrito', onPress: () => navigation.navigate('Carrito') },
+      ],
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -103,7 +124,7 @@ export default function ProductScreen({ route }: Props) {
           </View>
 
           {/* ── Botón agregar al carrito ── */}
-          <TouchableOpacity style={styles.cartButton} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.cartButton} activeOpacity={0.85} onPress={handleAddToCart}>
             <Ionicons name="cart-outline" size={22} color="#FFFFFF" />
             <Text style={styles.cartButtonText}>Agregar al carrito</Text>
           </TouchableOpacity>

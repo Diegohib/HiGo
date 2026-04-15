@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TabParamList } from './types';
 
 import HomeStack from './HomeStack';
-import CatalogScreen from '../screens/CatalogScreen';
+import CatalogStack from './CatalogStack';
 import ListScreen from '../screens/ListScreen';
 import AccountScreen from '../screens/AccountScreen';
 
@@ -54,7 +54,7 @@ export default function TabNavigator() {
       />
       <Tab.Screen
         name="Catalogo"
-        component={CatalogScreen}
+        component={CatalogStack}
         options={{ tabBarLabel: 'Categorías' }}
       />
       <Tab.Screen

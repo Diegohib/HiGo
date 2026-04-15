@@ -14,12 +14,24 @@ export type RootStackParamList = {
 export type HomeStackParamList = {
   Home: undefined;
   Catalog: {
-    categoryId: string;
-    categoryName: string;
-    categoryEmoji: string;
-    categoryColor: string;
+    categoryId?: string;
+    categoryName?: string;
+    categoryEmoji?: string;
+    categoryColor?: string;
   };
   Product: { productId: string };
+  Carrito: undefined;
+};
+
+export type CatalogStackParamList = {
+  Catalog: {
+    categoryId?: string;
+    categoryName?: string;
+    categoryEmoji?: string;
+    categoryColor?: string;
+  };
+  Product: { productId: string };
+  Carrito: undefined;
 };
 
 export type TabParamList = {
