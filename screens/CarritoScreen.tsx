@@ -12,7 +12,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { HomeStackParamList } from '../navigation/types';
-import { RootStackParamList } from '../navigation/types';
 import { useCartStore, CartItem } from '../store/cartStore';
 import { PRODUCTS } from '../data/products';
 
@@ -23,7 +22,6 @@ type CarritoNav = StackNavigationProp<HomeStackParamList, 'Carrito'>;
 
 export default function CarritoScreen() {
   const navigation    = useNavigation<CarritoNav>();
-  const rootNav       = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { items, updateQuantity, removeItem } = useCartStore();
 
   const subtotal    = items.reduce((s, i) => s + i.presentationPrice * i.quantity, 0);
@@ -32,7 +30,7 @@ export default function CarritoScreen() {
   const belowMin    = total > 0 && total < MINIMUM_ORDER;
 
   function handlePay() {
-    rootNav.navigate('Register');
+    navigation.navigate('Checkout');
   }
 
   // ── Fila de producto ────────────────────────────────────────────────────────

@@ -4,6 +4,8 @@ import HomeScreen from '../screens/HomeScreen';
 import CatalogScreen from '../screens/CatalogScreen';
 import ProductScreen from '../screens/ProductScreen';
 import CarritoScreen from '../screens/CarritoScreen';
+import CheckoutScreen from '../screens/CheckoutScreen';
+import MapPickerScreen from '../screens/MapPickerScreen';
 
 const Stack = createStackNavigator<HomeStackParamList>();
 
@@ -31,6 +33,16 @@ export default function HomeStack() {
       <Stack.Screen
         name="Carrito"
         component={CarritoScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Checkout"
+        component={CheckoutScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="MapPicker"
+        component={MapPickerScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

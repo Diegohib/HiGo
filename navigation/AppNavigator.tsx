@@ -9,6 +9,9 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import RoleSelectionScreen from '../screens/RoleSelectionScreen';
 import StaffRegisterScreen from '../screens/StaffRegisterScreen';
+import CocheroPayScreen         from '../screens/CocheroPayScreen';
+import TransportistaPayScreen   from '../screens/TransportistaPayScreen';
+import AdminPayScreen           from '../screens/AdminPayScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -49,6 +52,21 @@ export default function AppNavigator() {
           name="StaffRegister"
           component={StaffRegisterScreen}
           options={{ ...HEADER_OPTS, headerShown: true, title: 'Registro' }}
+        />
+        <Stack.Screen
+          name="CocheroDashboard"
+          component={CocheroPayScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="TransportistaDashboard"
+          component={TransportistaPayScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AdminDashboard"
+          component={AdminPayScreen}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -29,7 +29,11 @@ export default function LoginScreen({ navigation }: Props) {
           secureTextEntry
         />
 
-        <TouchableOpacity style={styles.loginButton} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.loginButton}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('CocheroDashboard')}
+        >
           <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
         </TouchableOpacity>
 
@@ -40,6 +44,13 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={styles.registerLink}>
             <Text style={styles.registerLinkBold}>Seleccioná tu rol para registrarte</Text>
           </Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [styles.adminLinkWrapper, pressed && { opacity: 0.6 }]}
+          onPress={() => navigation.navigate('AdminDashboard')}
+        >
+          <Text style={styles.adminLink}>💼 Acceso administrador</Text>
         </Pressable>
       </View>
     </View>
@@ -106,5 +117,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     opacity: 1,
     textDecorationLine: 'underline',
+  },
+  adminLinkWrapper: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  adminLink: {
+    color: '#C9B8FF',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

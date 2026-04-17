@@ -9,6 +9,12 @@ export type RootStackParamList = {
   Login: undefined;
   RoleSelection: undefined;
   StaffRegister: { role: StaffRole };
+  // Dashboard cochero
+  CocheroDashboard: undefined;
+  // Dashboard transportista
+  TransportistaDashboard: undefined;
+  // Dashboard admin
+  AdminDashboard: undefined;
 };
 
 export type HomeStackParamList = {
@@ -21,6 +27,12 @@ export type HomeStackParamList = {
   };
   Product: { productId: string };
   Carrito: undefined;
+  Checkout: {
+    pickedAddress?: string;
+    pickedLat?: number;
+    pickedLng?: number;
+  } | undefined;
+  MapPicker: undefined;
 };
 
 export type CatalogStackParamList = {
