@@ -72,7 +72,7 @@ export default function CocheroPayScreen({ navigation }: Props) {
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.headerEmoji}>🚲</Text>
+          <Ionicons name="bicycle" size={22} color={C.white} />
           <Text style={styles.headerTitle}>Mis Ganancias</Text>
           <Text style={styles.headerWeek}>{weekLabel}</Text>
         </View>

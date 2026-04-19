@@ -18,6 +18,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { HomeStackParamList } from '../navigation/types';
 import { RootStackParamList } from '../navigation/types';
 import { useCartStore } from '../store/cartStore';
+import { useAuthStore } from '../store/authStore';
 import { PRODUCTS } from '../data/products';
 import { calcTransport, TransportInfo } from '../utils/transport';
 
@@ -28,8 +29,6 @@ const MANAGEMENT_FEE = 0.07;
 type DeliveryType = 'programada' | 'directa';
 type TimeSlot     = '10:00 - 12:00' | '14:00 - 16:00';
 
-const IS_USER_REGISTERED = false; // reemplazar con store de auth
-
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function CheckoutScreen() {
@@ -37,6 +36,7 @@ export default function CheckoutScreen() {
   const rootNav    = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route      = useRoute<RouteProp<HomeStackParamList, 'Checkout'>>();
   const { items }  = useCartStore();
+  const isRegistered = useAuthStore((s) => s.user !== null);
 
   // ── Dirección ───────────────────────────────────────────────────────────────
   const [address,   setAddress]   = useState('');
@@ -85,8 +85,25 @@ export default function CheckoutScreen() {
 
   // ── Confirmar pedido ────────────────────────────────────────────────────────
   function handleConfirm() {
-    if (!IS_USER_REGISTERED) { setShowModal(true); return; }
-    // TODO: enviar pedido al backend
+    if (!isRegistered) { setShowModal(true); return; }
+
+    const orderId       = Date.now().toString().slice(-6);
+    const estimatedTime = delivery === 'directa' ? 'Lo antes posible' : timeSlot;
+    const operatorRole: 'cochero' | 'transportista' = transport ? 'transportista' : 'cochero';
+    const operatorName  = operatorRole === 'cochero' ? 'Carlos Pérez'    : 'Roberto Mendoza';
+    const operatorPhone = operatorRole === 'cochero' ? '+593 99 123 4567' : '+593 98 765 4321';
+
+    navigation.navigate('OrderTracking', {
+      orderId,
+      address:       address || 'Dirección no especificada',
+      estimatedTime,
+      currentStatus: 'recibido',
+      operatorName,
+      operatorPhone,
+      operatorRole,
+      deliveryLat:   pinLat ?? undefined,
+      deliveryLng:   pinLng ?? undefined,
+    });
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────

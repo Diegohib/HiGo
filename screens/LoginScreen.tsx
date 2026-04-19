@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Pressable } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Pressable, Alert } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
 
@@ -6,7 +7,41 @@ type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'Login'>;
 };
 
+// ─── Usuarios mock de prueba ──────────────────────────────────────────────────
+
+const MOCK_USERS: { email: string; password: string; dashboard: keyof RootStackParamList }[] = [
+  { email: 'cochero@higo.com',       password: '123456', dashboard: 'CocheroDashboard'       },
+  { email: 'transportista@higo.com', password: '123456', dashboard: 'TransportistaDashboard' },
+  { email: 'admin@higo.com',         password: '123456', dashboard: 'AdminDashboard'         },
+  { email: 'comerciante@higo.com',   password: '123456', dashboard: 'ComercianteDashboard'   },
+];
+
+// ─── Componente ───────────────────────────────────────────────────────────────
+
 export default function LoginScreen({ navigation }: Props) {
+  const [email,    setEmail]    = useState('');
+  const [password, setPassword] = useState('');
+
+  function handleLogin() {
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedEmail || !password) {
+      Alert.alert('Campos incompletos', 'Ingresá tu correo y contraseña.');
+      return;
+    }
+
+    const user = MOCK_USERS.find(
+      (u) => u.email === trimmedEmail && u.password === password
+    );
+
+    if (!user) {
+      Alert.alert('Credenciales incorrectas', 'El correo o la contraseña no coinciden.');
+      return;
+    }
+
+    navigation.reset({ index: 0, routes: [{ name: user.dashboard }] });
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -21,18 +56,22 @@ export default function LoginScreen({ navigation }: Props) {
           placeholderTextColor="#999"
           keyboardType="email-address"
           autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
         />
         <TextInput
           style={styles.input}
           placeholder="Contraseña"
           placeholderTextColor="#999"
           secureTextEntry
+          value={password}
+          onChangeText={setPassword}
         />
 
         <TouchableOpacity
           style={styles.loginButton}
           activeOpacity={0.85}
-          onPress={() => navigation.navigate('CocheroDashboard')}
+          onPress={handleLogin}
         >
           <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
         </TouchableOpacity>
@@ -56,6 +95,8 @@ export default function LoginScreen({ navigation }: Props) {
     </View>
   );
 }
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {

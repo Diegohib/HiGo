@@ -1,6 +1,6 @@
 // ─── Tarifas cochero ──────────────────────────────────────────────────────────
-// Pedido $15-$25 → $1.50 | $25-$50 → $3.00 | $50-$75 → $4.50
-// $75-$100 → $6.00 | >$100 → $7.00
+// $15-$30 → $1.00 | $31-$60 → $2.00 | $61-$90 → $3.00
+// $91-$120 → $4.00 | $121-$150 → $5.00 | >$150 → $6.00 (tope)
 
 export interface EarningTier {
   label:   string;
@@ -10,11 +10,12 @@ export interface EarningTier {
 }
 
 export const EARNING_TIERS: EarningTier[] = [
-  { label: '$15 – $25',   min:  15, max:  25,  earning: 1.50 },
-  { label: '$25 – $50',   min:  25, max:  50,  earning: 3.00 },
-  { label: '$50 – $75',   min:  50, max:  75,  earning: 4.50 },
-  { label: '$75 – $100',  min:  75, max: 100,  earning: 6.00 },
-  { label: 'Más de $100', min: 100, max: null, earning: 7.00 },
+  { label: '$15 – $30',    min:  15, max:  30,  earning: 1.00 },
+  { label: '$31 – $60',    min:  31, max:  60,  earning: 2.00 },
+  { label: '$61 – $90',    min:  61, max:  90,  earning: 3.00 },
+  { label: '$91 – $120',   min:  91, max: 120,  earning: 4.00 },
+  { label: '$121 – $150',  min: 121, max: 150,  earning: 5.00 },
+  { label: 'Más de $150',  min: 151, max: null, earning: 6.00 },
 ];
 
 /** Calcula la ganancia del cochero por un pedido según su total. */

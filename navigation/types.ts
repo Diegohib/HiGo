@@ -14,7 +14,11 @@ export type RootStackParamList = {
   // Dashboard transportista
   TransportistaDashboard: undefined;
   // Dashboard admin
-  AdminDashboard: undefined;
+  AdminDashboard:       undefined;
+  AdminSolicitudes:     undefined;
+  AdminFinanzas:        undefined;
+  // Dashboard comerciante
+  ComercianteDashboard: undefined;
 };
 
 export type HomeStackParamList = {

@@ -77,7 +77,7 @@ export default function TransportistaPayScreen({ navigation }: Props) {
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.headerEmoji}>🚚</Text>
+          <Ionicons name="car" size={22} color={C.white} />
           <Text style={styles.headerTitle}>Mis Ganancias</Text>
           <Text style={styles.headerWeek}>{weekLabel}</Text>
         </View>

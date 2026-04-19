@@ -1,12 +1,47 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Pressable, ScrollView } from 'react-native';
+import { useState } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Pressable,
+  ScrollView,
+  Alert,
+} from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
+import { useAuthStore } from '../store/authStore';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'Register'>;
 };
 
 export default function RegisterScreen({ navigation }: Props) {
+  const register = useAuthStore((s) => s.register);
+
+  const [name,            setName]            = useState('');
+  const [email,           setEmail]           = useState('');
+  const [phone,           setPhone]           = useState('');
+  const [password,        setPassword]        = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  function handleRegister() {
+    if (!name.trim() || !email.trim() || !phone.trim() || !password || !confirmPassword) {
+      Alert.alert('Campos incompletos', 'Por favor completá todos los campos.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Contraseñas distintas', 'Las contraseñas no coinciden.');
+      return;
+    }
+
+    register({ name: name.trim(), email: email.trim(), phone: phone.trim(), role: 'cliente' });
+
+    navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    Alert.alert('¡Bienvenido a HiGo!', `Hola ${name.trim()}, tu cuenta fue creada con éxito.`);
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
@@ -20,6 +55,8 @@ export default function RegisterScreen({ navigation }: Props) {
           placeholder="Nombre completo"
           placeholderTextColor="#999"
           autoCapitalize="words"
+          value={name}
+          onChangeText={setName}
         />
         <TextInput
           style={styles.input}
@@ -27,30 +64,38 @@ export default function RegisterScreen({ navigation }: Props) {
           placeholderTextColor="#999"
           keyboardType="email-address"
           autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
         />
         <TextInput
           style={styles.input}
           placeholder="Teléfono"
           placeholderTextColor="#999"
           keyboardType="phone-pad"
+          value={phone}
+          onChangeText={setPhone}
         />
         <TextInput
           style={styles.input}
           placeholder="Contraseña"
           placeholderTextColor="#999"
           secureTextEntry
+          value={password}
+          onChangeText={setPassword}
         />
         <TextInput
           style={styles.input}
           placeholder="Confirmar contraseña"
           placeholderTextColor="#999"
           secureTextEntry
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
         />
 
         <TouchableOpacity
           style={styles.registerButton}
           activeOpacity={0.85}
-          onPress={() => navigation.navigate('MainTabs')}
+          onPress={handleRegister}
         >
           <Text style={styles.registerButtonText}>Crear Cuenta</Text>
         </TouchableOpacity>

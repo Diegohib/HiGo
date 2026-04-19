@@ -9,9 +9,14 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import RoleSelectionScreen from '../screens/RoleSelectionScreen';
 import StaffRegisterScreen from '../screens/StaffRegisterScreen';
-import CocheroPayScreen         from '../screens/CocheroPayScreen';
-import TransportistaPayScreen   from '../screens/TransportistaPayScreen';
-import AdminPayScreen           from '../screens/AdminPayScreen';
+import CocheroDashboardScreen         from '../screens/CocheroDashboardScreen';
+import CocheroPayScreen              from '../screens/CocheroPayScreen';
+import TransportistaDashboardScreen  from '../screens/TransportistaDashboardScreen';
+import TransportistaPayScreen        from '../screens/TransportistaPayScreen';
+import AdminPayScreen                from '../screens/AdminPayScreen';
+import AdminSolicitudesScreen       from '../screens/AdminSolicitudesScreen';
+import AdminFinanzasScreen          from '../screens/AdminFinanzasScreen';
+import ComercianteDashboardScreen   from '../screens/ComercianteDashboardScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -55,17 +60,32 @@ export default function AppNavigator() {
         />
         <Stack.Screen
           name="CocheroDashboard"
-          component={CocheroPayScreen}
+          component={CocheroDashboardScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="TransportistaDashboard"
-          component={TransportistaPayScreen}
+          component={TransportistaDashboardScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="AdminDashboard"
           component={AdminPayScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AdminSolicitudes"
+          component={AdminSolicitudesScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AdminFinanzas"
+          component={AdminFinanzasScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ComercianteDashboard"
+          component={ComercianteDashboardScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
