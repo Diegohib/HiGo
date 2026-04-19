@@ -50,7 +50,7 @@ export default function RegisterScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.registerButton}
           activeOpacity={0.85}
-          onPress={() => navigation.navigate('RoleSelection')}
+          onPress={() => navigation.navigate('MainTabs')}
         >
           <Text style={styles.registerButtonText}>Crear Cuenta</Text>
         </TouchableOpacity>
