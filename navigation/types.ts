@@ -33,6 +33,17 @@ export type HomeStackParamList = {
     pickedLng?: number;
   } | undefined;
   MapPicker: undefined;
+  OrderTracking: {
+    orderId: string;
+    address: string;
+    estimatedTime: string;
+    currentStatus: 'recibido' | 'en_mercado' | 'consolidado' | 'en_camino' | 'entregado';
+    operatorName: string;
+    operatorPhone: string;
+    operatorRole: 'cochero' | 'transportista';
+    deliveryLat?: number;
+    deliveryLng?: number;
+  };
 };
 
 export type CatalogStackParamList = {
