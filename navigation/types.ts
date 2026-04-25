@@ -51,6 +51,7 @@ export type HomeStackParamList = {
 };
 
 export type CatalogStackParamList = {
+  Categories: undefined;
   Catalog: {
     categoryId?: string;
     categoryName?: string;

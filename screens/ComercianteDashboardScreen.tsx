@@ -16,8 +16,8 @@ type Props = {
 
 type Tab = 'pedidos' | 'ganancias' | 'perfil';
 
-const HEADER   = '#A0390E';
-const HEADER2  = '#C4623A';
+const HEADER   = '#C4623A';
+const HEADER2  = '#A0390E';
 const BG       = '#FDF6F3';
 
 // ─── Tab: Despachos ───────────────────────────────────────────────────────────
