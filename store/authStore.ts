@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface ClienteUser {
   name: string;
@@ -13,8 +15,16 @@ interface AuthState {
   logout: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  register: (user) => set({ user }),
-  logout: () => set({ user: null }),
-}));
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      register: (user) => set({ user }),
+      logout: () => set({ user: null }),
+    }),
+    {
+      name: 'higo-auth',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+);

@@ -99,9 +99,10 @@ export default function OrderTrackingScreen() {
     deliveryLng,
   } = route.params;
 
-  const currentIndex = STATUS_INDEX[currentStatus];
-  const currentStep  = STEPS[currentIndex];
-  const isEnCamino   = currentStatus === 'en_camino';
+  const currentIndex  = STATUS_INDEX[currentStatus];
+  const currentStep   = STEPS[currentIndex];
+  const isEnCamino    = currentStatus === 'en_camino';
+  const isEntregado   = currentStatus === 'entregado';
 
   function handleCall() {
     Linking.openURL(`tel:${operatorPhone}`);
@@ -220,6 +221,17 @@ export default function OrderTrackingScreen() {
           })}
         </View>
 
+        {/* Tarjeta de éxito: solo cuando entregado */}
+        {isEntregado && (
+          <View style={styles.successCard}>
+            <View style={styles.successIconWrapper}>
+              <Ionicons name="checkmark-circle" size={64} color="#2E7D32" />
+            </View>
+            <Text style={styles.successTitle}>¡Pedido entregado!</Text>
+            <Text style={styles.successSubtitle}>Gracias por usar HiGo</Text>
+          </View>
+        )}
+
         {/* Tarjeta operador */}
         <View style={styles.operatorCard}>
           <View style={styles.operatorHeader}>
@@ -251,6 +263,18 @@ export default function OrderTrackingScreen() {
           <TouchableOpacity style={styles.mapBtn} onPress={handleMap} activeOpacity={0.85}>
             <Ionicons name="map" size={20} color="#FFF" />
             <Text style={styles.mapBtnText}>Rastrear en mapa</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Botón nuevo pedido: solo cuando entregado */}
+        {isEntregado && (
+          <TouchableOpacity
+            style={styles.newOrderBtn}
+            activeOpacity={0.85}
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] })}
+          >
+            <Ionicons name="cart-outline" size={20} color="#FFF" />
+            <Text style={styles.newOrderBtnText}>Hacer nuevo pedido</Text>
           </TouchableOpacity>
         )}
 
@@ -492,6 +516,54 @@ const styles = StyleSheet.create({
   phoneText: {
     fontSize: 13,
     color: '#555',
+  },
+
+  // Tarjeta éxito
+  successCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 28,
+    marginBottom: 16,
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#2E7D32',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  successIconWrapper: {
+    marginBottom: 4,
+  },
+  successTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1A1A1A',
+  },
+  successSubtitle: {
+    fontSize: 14,
+    color: '#9B8EC4',
+  },
+
+  // Botón nuevo pedido
+  newOrderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#2ECC71',
+    borderRadius: 14,
+    paddingVertical: 16,
+    shadowColor: '#2ECC71',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  newOrderBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
   },
 
   // Botón mapa

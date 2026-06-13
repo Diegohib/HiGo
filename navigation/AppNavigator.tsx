@@ -1,8 +1,10 @@
 import 'react-native-gesture-handler';
+import { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { RootStackParamList } from './types';
 
+import { useAuthStore } from '../store/authStore';
 import SplashScreen from '../screens/SplashScreen';
 import TabNavigator from './TabNavigator';
 import LoginScreen from '../screens/LoginScreen';
@@ -28,9 +30,27 @@ const HEADER_OPTS = {
 };
 
 export default function AppNavigator() {
+  const user = useAuthStore((s) => s.user);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) {
+      setHydrated(true);
+    } else {
+      const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+      return unsub;
+    }
+  }, []);
+
+  if (!hydrated) return null;
+
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        key={user ? 'authed' : 'guest'}
+        initialRouteName={user ? 'MainTabs' : 'Splash'}
+        screenOptions={{ headerShown: false }}
+      >
         {/* Pantalla de entrada */}
         <Stack.Screen name="Splash" component={SplashScreen} />
 

@@ -37,6 +37,7 @@ export default function CheckoutScreen() {
   const route      = useRoute<RouteProp<HomeStackParamList, 'Checkout'>>();
   const { items }  = useCartStore();
   const isRegistered = useAuthStore((s) => s.user !== null);
+  const { clearCart } = useCartStore();
 
   // ── Dirección ───────────────────────────────────────────────────────────────
   const [address,   setAddress]   = useState('');
@@ -86,6 +87,7 @@ export default function CheckoutScreen() {
   // ── Confirmar pedido ────────────────────────────────────────────────────────
   function handleConfirm() {
     if (!isRegistered) { setShowModal(true); return; }
+    if (!hasMapPin) { return; }
 
     const orderId       = Date.now().toString().slice(-6);
     const estimatedTime = delivery === 'directa' ? 'Lo antes posible' : timeSlot;
@@ -93,6 +95,7 @@ export default function CheckoutScreen() {
     const operatorName  = operatorRole === 'cochero' ? 'Carlos Pérez'    : 'Roberto Mendoza';
     const operatorPhone = operatorRole === 'cochero' ? '+593 99 123 4567' : '+593 98 765 4321';
 
+    clearCart();
     navigation.navigate('OrderTracking', {
       orderId,
       address:       address || 'Dirección no especificada',
@@ -347,9 +350,15 @@ export default function CheckoutScreen() {
           </View>
 
           {/* ── Botón confirmar ── */}
-          <TouchableOpacity style={styles.confirmBtn} activeOpacity={0.85} onPress={handleConfirm}>
+          <TouchableOpacity
+            style={[styles.confirmBtn, !hasMapPin && styles.confirmBtnDisabled]}
+            activeOpacity={0.85}
+            onPress={handleConfirm}
+          >
             <Ionicons name="checkmark-circle-outline" size={22} color="#FFFFFF" />
-            <Text style={styles.confirmBtnText}>Confirmar pedido</Text>
+            <Text style={styles.confirmBtnText}>
+              {hasMapPin ? 'Confirmar pedido' : 'Selecciona tu ubicación primero'}
+            </Text>
           </TouchableOpacity>
 
         </ScrollView>
@@ -541,6 +550,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   confirmBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  confirmBtnDisabled: {
+    backgroundColor: '#BEB3E0',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
 
   // Modal
   modalOverlay: {
