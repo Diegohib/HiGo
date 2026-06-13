@@ -75,6 +75,8 @@ export default function TransportistaDashboardScreen({ navigation }: Props) {
     confirmarEntrega,
   } = useTransportistaDeliveryStore();
 
+  const user = useAuthStore((s) => s.user);
+
   const pendientes  = deliveries.filter((d) => d.status === 'pendiente').length;
   const totalHoy    = deliveries.reduce((s, d) => s + d.earning, 0);
 
@@ -118,11 +120,13 @@ export default function TransportistaDashboardScreen({ navigation }: Props) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatarCircle}>
-            <Ionicons name="car" size={22} color="rgba(255,255,255,0.9)" />
+            <Text style={{ fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.9)' }}>
+              {user?.name?.[0]?.toUpperCase() ?? 'T'}
+            </Text>
           </View>
           <View>
             <Text style={styles.headerGreeting}>Hola,</Text>
-            <Text style={styles.headerName}>Roberto Mendoza</Text>
+            <Text style={styles.headerName}>{user?.name ?? 'Transportista'}</Text>
           </View>
         </View>
 
@@ -589,6 +593,7 @@ function GananciasTab() {
 // ─── Tab: Perfil ──────────────────────────────────────────────────────────────
 
 function PerfilTab({ onLogout }: { onLogout: () => void }) {
+  const user = useAuthStore((s) => s.user);
   return (
     <ScrollView
       style={styles.scroll}
@@ -597,18 +602,20 @@ function PerfilTab({ onLogout }: { onLogout: () => void }) {
     >
       <View style={styles.perfilAvatarWrapper}>
         <View style={styles.perfilAvatar}>
-          <Ionicons name="car" size={38} color={C.header} />
+          <Text style={{ fontSize: 32, fontWeight: '800', color: C.header }}>
+            {user?.name?.[0]?.toUpperCase() ?? 'T'}
+          </Text>
         </View>
-        <Text style={styles.perfilName}>Roberto Mendoza</Text>
+        <Text style={styles.perfilName}>{user?.name ?? 'Transportista'}</Text>
         <View style={styles.perfilRolePill}>
           <Text style={styles.perfilRoleText}>Transportista</Text>
         </View>
       </View>
 
       <View style={styles.perfilCard}>
-        <PerfilRow icon="call-outline"      label="Teléfono"   value="+593 98 765 4321" />
+        <PerfilRow icon="call-outline"      label="Teléfono"   value={(user as any)?.phone ?? '—'} />
         <View style={styles.cardDivider} />
-        <PerfilRow icon="card-outline"      label="Cédula"     value="17XXXXXXXX" />
+        <PerfilRow icon="card-outline"      label="Cédula"     value={(user as any)?.cedula ?? '—'} />
         <View style={styles.cardDivider} />
         <PerfilRow icon="car-outline"       label="Vehículo"   value="Camioneta D-MAX" />
         <View style={styles.cardDivider} />
