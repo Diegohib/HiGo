@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList, StaffRole } from '../navigation/types';
+import { useAuthStore } from '../store/authStore';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'StaffRegister'>;
@@ -183,8 +184,11 @@ function GiroPicker({
 export default function StaffRegisterScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const config = ROLE_CONFIG[role];
+  const user = useAuthStore((s) => s.user);
 
-  const [uploaded, setUploaded] = useState<Partial<Record<PhotoUploadKey, boolean>>>({});
+  const [name,       setName]       = useState(user?.name  ?? '');
+  const [phone,      setPhone]      = useState((user as any)?.phone ?? '');
+  const [uploaded,   setUploaded]   = useState<Partial<Record<PhotoUploadKey, boolean>>>({});
   const [selectedGiro, setSelectedGiro] = useState<string | null>(null);
 
   function toggleUpload(key: PhotoUploadKey) {
@@ -215,12 +219,16 @@ export default function StaffRegisterScreen({ navigation, route }: Props) {
           placeholder="Nombre completo"
           placeholderTextColor="#9B8EC4"
           autoCapitalize="words"
+          value={name}
+          onChangeText={setName}
         />
         <TextInput
           style={styles.input}
           placeholder="Teléfono de contacto"
           placeholderTextColor="#9B8EC4"
           keyboardType="phone-pad"
+          value={phone}
+          onChangeText={setPhone}
         />
 
         {/* ── Campos específicos del rol ── */}
