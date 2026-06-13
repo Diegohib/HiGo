@@ -389,22 +389,25 @@ const fi = StyleSheet.create({
 // ─── Tab: Perfil ──────────────────────────────────────────────────────────────
 
 function PerfilTab({ onLogout }: { onLogout: () => void }) {
+  const user = useAuthStore((s) => s.user);
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} showsVerticalScrollIndicator={false}>
       <View style={pf.wrapper}>
         <View style={pf.avatar}>
-          <Ionicons name="briefcase-outline" size={38} color={C.purple} />
+          <Text style={{ fontSize: 32, fontWeight: '800', color: C.purple }}>
+            {user?.name?.[0]?.toUpperCase() ?? 'A'}
+          </Text>
         </View>
-        <Text style={pf.name}>HiGo Admin</Text>
+        <Text style={pf.name}>{user?.name ?? 'Admin'}</Text>
         <View style={pf.rolePill}>
           <Text style={pf.roleText}>Administrador</Text>
         </View>
       </View>
 
       <View style={pf.card}>
-        <PerfilRow icon="mail-outline"              label="Email"    value="admin@higo.com" />
+        <PerfilRow icon="mail-outline"              label="Email"    value={user?.email ?? '—'} />
         <View style={pf.divider} />
-        <PerfilRow icon="call-outline"              label="Teléfono" value="+593 99 000 0000" />
+        <PerfilRow icon="call-outline"              label="Teléfono" value={(user as any)?.phone ?? '—'} />
         <View style={pf.divider} />
         <PerfilRow icon="shield-checkmark-outline"  label="Rol"      value="Administrador" valueColor={C.purple} />
         <View style={pf.divider} />
@@ -490,6 +493,8 @@ export default function AdminPayScreen({ navigation }: Props) {
   const [activeTab,  setActiveTab]  = useState<Tab>('pagos');
   const [disponible, setDisponible] = useState(true);
 
+  const user = useAuthStore((s) => s.user);
+
   const { operators } = useAdminPayStore();
   const pendingCount  = operators.filter(o => !o.isPaid).length;
 
@@ -511,11 +516,13 @@ export default function AdminPayScreen({ navigation }: Props) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatarCircle}>
-            <Ionicons name="briefcase-outline" size={22} color="rgba(255,255,255,0.9)" />
+            <Text style={{ fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.9)' }}>
+              {user?.name?.[0]?.toUpperCase() ?? 'A'}
+            </Text>
           </View>
           <View>
             <Text style={styles.headerGreeting}>Administrador</Text>
-            <Text style={styles.headerName}>HiGo Admin</Text>
+            <Text style={styles.headerName}>{user?.name ?? 'Admin'}</Text>
           </View>
         </View>
         <TouchableOpacity
