@@ -55,6 +55,8 @@ export default function CocheroDashboardScreen({ navigation }: Props) {
   const { tickets, disponible, toggleDisponible, iniciarRecogida, consolidarTodos } =
     useCocheroTicketStore();
 
+  const user = useAuthStore((s) => s.user);
+
   const hasPendiente    = tickets.some((t) => t.status === 'pendiente');
   const hasEnMercado    = tickets.some((t) => t.status === 'en_mercado');
   const allDone         = tickets.every((t) => t.status === 'consolidado');
@@ -82,11 +84,13 @@ export default function CocheroDashboardScreen({ navigation }: Props) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatarCircle}>
-            <Ionicons name="bicycle" size={22} color="rgba(255,255,255,0.9)" />
+            <Text style={{ fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.9)' }}>
+              {user?.name?.[0]?.toUpperCase() ?? 'C'}
+            </Text>
           </View>
           <View>
             <Text style={styles.headerGreeting}>Hola,</Text>
-            <Text style={styles.headerName}>Carlos Pérez</Text>
+            <Text style={styles.headerName}>{user?.name ?? 'Cochero'}</Text>
           </View>
         </View>
 
@@ -398,6 +402,7 @@ function GananciasTab() {
 // ─── Tab: Perfil ──────────────────────────────────────────────────────────────
 
 function PerfilTab({ onLogout }: { onLogout: () => void }) {
+  const user = useAuthStore((s) => s.user);
   return (
     <ScrollView
       style={styles.scroll}
@@ -407,9 +412,11 @@ function PerfilTab({ onLogout }: { onLogout: () => void }) {
       {/* Avatar */}
       <View style={styles.perfilAvatarWrapper}>
         <View style={styles.perfilAvatar}>
-          <Ionicons name="bicycle" size={38} color={C.greenDark} />
+          <Text style={{ fontSize: 32, fontWeight: '800', color: C.greenDark }}>
+            {user?.name?.[0]?.toUpperCase() ?? 'C'}
+          </Text>
         </View>
-        <Text style={styles.perfilName}>Carlos Pérez</Text>
+        <Text style={styles.perfilName}>{user?.name ?? 'Cochero'}</Text>
         <View style={styles.perfilRolePill}>
           <Text style={styles.perfilRoleText}>Cochero</Text>
         </View>
@@ -417,9 +424,9 @@ function PerfilTab({ onLogout }: { onLogout: () => void }) {
 
       {/* Datos */}
       <View style={styles.perfilCard}>
-        <PerfilRow icon="call-outline"      label="Teléfono"  value="+593 99 123 4567" />
+        <PerfilRow icon="call-outline"      label="Teléfono"  value={(user as any)?.phone ?? '—'} />
         <View style={styles.ticketDivider} />
-        <PerfilRow icon="card-outline"      label="Cédula"    value="17XXXXXXXX" />
+        <PerfilRow icon="card-outline"      label="Cédula"    value={(user as any)?.cedula ?? '—'} />
         <View style={styles.ticketDivider} />
         <PerfilRow icon="bicycle-outline"   label="Coche No." value="042" />
         <View style={styles.ticketDivider} />
