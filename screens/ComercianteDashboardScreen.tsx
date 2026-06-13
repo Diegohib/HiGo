@@ -384,13 +384,16 @@ function PerfilTabC({
 }: {
   onLogout: () => void; merchantName: string; merchantStall: string;
 }) {
+  const user = useAuthStore((s) => s.user);
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 14 }} showsVerticalScrollIndicator={false}>
       <View style={pf.wrapper}>
         <View style={pf.avatar}>
-          <Ionicons name="storefront-outline" size={38} color={HEADER} />
+          <Text style={{ fontSize: 32, fontWeight: '800', color: HEADER }}>
+            {user?.name?.[0]?.toUpperCase() ?? 'C'}
+          </Text>
         </View>
-        <Text style={pf.name}>{merchantName}</Text>
+        <Text style={pf.name}>{user?.name ?? merchantName}</Text>
         <View style={pf.rolePill}>
           <Text style={pf.roleText}>Comerciante</Text>
         </View>
@@ -399,9 +402,9 @@ function PerfilTabC({
       <View style={pf.card}>
         <PerfilRowC icon="storefront-outline"       label="Puesto"    value={merchantStall} />
         <View style={pf.divider} />
-        <PerfilRowC icon="call-outline"             label="Teléfono"  value="+593 99 000 0000" />
+        <PerfilRowC icon="call-outline"             label="Teléfono"  value={(user as any)?.phone ?? '—'} />
         <View style={pf.divider} />
-        <PerfilRowC icon="card-outline"             label="Cédula"    value="17XXXXXXXX" />
+        <PerfilRowC icon="card-outline"             label="Cédula"    value={(user as any)?.cedula ?? '—'} />
         <View style={pf.divider} />
         <PerfilRowC icon="shield-checkmark-outline" label="Estado"    value="Verificado" valueColor="#27AE60" />
       </View>
@@ -483,6 +486,7 @@ const tb = StyleSheet.create({
 export default function ComercianteDashboardScreen({ navigation }: Props) {
   const [activeTab, setActiveTab]     = useState<Tab>('pedidos');
   const [disponible, setDisponible]   = useState(true);
+  const user = useAuthStore((s) => s.user);
   const { merchantName, merchantStall, dispatchTickets } = useComercianteStore();
   const pendienteCount = dispatchTickets.filter(t => t.status === 'pendiente').length;
 
@@ -504,7 +508,9 @@ export default function ComercianteDashboardScreen({ navigation }: Props) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatarCircle}>
-            <Ionicons name="storefront-outline" size={22} color="rgba(255,255,255,0.9)" />
+            <Text style={{ fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.9)' }}>
+              {user?.name?.[0]?.toUpperCase() ?? 'C'}
+            </Text>
           </View>
           <View>
             <Text style={styles.headerGreeting}>Hola,</Text>
