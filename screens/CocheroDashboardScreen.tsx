@@ -4,7 +4,6 @@ import {
   Text,
   View,
   ScrollView,
-  FlatList,
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
@@ -194,13 +193,20 @@ function TicketsTab({
       {/* Lista de tickets */}
       <Text style={styles.sectionTitle}>Tickets del día</Text>
 
-      {tickets.map((ticket) => (
-        <TicketCard
-          key={ticket.id}
-          ticket={ticket}
-          onIniciar={() => onIniciar(ticket.id)}
-        />
-      ))}
+      {tickets.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="tray-outline" size={52} color={C.textSoft} />
+          <Text style={styles.emptyStateText}>No tienes tickets por ahora</Text>
+        </View>
+      ) : (
+        tickets.map((ticket) => (
+          <TicketCard
+            key={ticket.id}
+            ticket={ticket}
+            onIniciar={() => onIniciar(ticket.id)}
+          />
+        ))
+      )}
 
       {/* Botón consolidar */}
       {showConsolidar && (
@@ -428,7 +434,7 @@ function PerfilTab({ onLogout }: { onLogout: () => void }) {
         <View style={styles.ticketDivider} />
         <PerfilRow icon="card-outline"      label="Cédula"    value={(user as any)?.cedula ?? '—'} />
         <View style={styles.ticketDivider} />
-        <PerfilRow icon="bicycle-outline"   label="Coche No." value="042" />
+        <PerfilRow icon="bicycle-outline"   label="Coche No." value={(user as any)?.cocheNo ?? 'Sin asignar'} />
         <View style={styles.ticketDivider} />
         <PerfilRow icon="shield-checkmark-outline" label="Estado" value="Verificado" valueColor={C.greenDark} />
       </View>
@@ -959,6 +965,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   logoutText: { fontSize: 15, fontWeight: '700', color: '#E74C3C' },
+
+  // ── Empty state
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    gap: 12,
+  },
+  emptyStateText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.textSoft,
+  },
 
   // ── Bottom tab bar
   tabBar: {
