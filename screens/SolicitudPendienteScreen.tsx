@@ -66,22 +66,8 @@ export default function SolicitudPendienteScreen({ navigation, route }: Props) {
     return () => anim.stop();
   }, []);
 
-  // ── Solicitud no encontrada ───────────────────────────────────────────────
-  if (!sol) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
-        <View style={styles.center}>
-          <Text style={styles.softText}>No se encontró la solicitud.</Text>
-          <TouchableOpacity
-            style={styles.linkBtn}
-            onPress={() => navigation.navigate('RoleSelection')}
-          >
-            <Text style={styles.linkText}>Volver al inicio</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
+  function handleVolver() {
+    navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
   }
 
   function handleEntrar() {
@@ -96,94 +82,107 @@ export default function SolicitudPendienteScreen({ navigation, route }: Props) {
     navigation.navigate('StaffRegister', { role: sol!.role });
   }
 
-  const roleLabel = sol.role.charAt(0).toUpperCase() + sol.role.slice(1);
+  const roleLabel = sol
+    ? sol.role.charAt(0).toUpperCase() + sol.role.slice(1)
+    : '';
 
-  // ── Pendiente ─────────────────────────────────────────────────────────────
-  if (sol.status === 'pendiente') {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
-        <View style={styles.center}>
-          <Animated.View
-            style={[styles.iconCircle, styles.amberCircle, { transform: [{ scale: pulse }] }]}
-          >
-            <Ionicons name="time-outline" size={52} color={C.amber} />
-          </Animated.View>
-
-          <Text style={styles.title}>Solicitud enviada</Text>
-          <Text style={styles.subtitle}>Tu solicitud está siendo revisada</Text>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoName}>{sol.name}</Text>
-            <Text style={styles.infoRole}>{roleLabel}</Text>
-          </View>
-
-          <Text style={styles.hint}>
-            El administrador te responderá en menos de 24 horas
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // ── Aprobada ──────────────────────────────────────────────────────────────
-  if (sol.status === 'aprobada') {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
-        <View style={styles.center}>
-          <View style={[styles.iconCircle, styles.greenCircle]}>
-            <Ionicons name="checkmark-circle" size={60} color={C.green} />
-          </View>
-
-          <Text style={styles.title}>¡Fuiste aprobado!</Text>
-          <Text style={styles.subtitle}>Ya puedes ingresar a tu dashboard</Text>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoName}>{sol.name}</Text>
-            <Text style={styles.infoRole}>{roleLabel}</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            activeOpacity={0.85}
-            onPress={handleEntrar}
-          >
-            <Ionicons name="enter-outline" size={22} color={C.white} />
-            <Text style={styles.primaryBtnText}>Entrar al dashboard</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // ── Rechazada ─────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={C.bg} />
-      <View style={styles.center}>
-        <View style={[styles.iconCircle, styles.redCircle]}>
-          <Ionicons name="close-circle" size={60} color={C.red} />
-        </View>
 
-        <Text style={styles.title}>Solicitud rechazada</Text>
-        <Text style={styles.subtitle}>Tu solicitud no fue aprobada</Text>
-
-        {sol.rejectionReason ? (
-          <View style={styles.rejectionCard}>
-            <Ionicons name="alert-circle-outline" size={18} color={C.red} />
-            <Text style={styles.rejectionText}>{sol.rejectionReason}</Text>
-          </View>
-        ) : null}
-
-        <TouchableOpacity
-          style={styles.secondaryBtn}
-          activeOpacity={0.85}
-          onPress={handleReintentar}
-        >
-          <Ionicons name="refresh-outline" size={20} color={C.white} />
-          <Text style={styles.secondaryBtnText}>Volver a enviar solicitud</Text>
+      {/* ── Botón atrás — visible en los 3 estados ── */}
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backBtn} activeOpacity={0.7} onPress={handleVolver}>
+          <Ionicons name="arrow-back" size={22} color={C.white} />
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.center}>
+
+        {/* ── Solicitud no encontrada ── */}
+        {!sol && (
+          <>
+            <Text style={styles.softText}>No se encontró la solicitud.</Text>
+          </>
+        )}
+
+        {/* ── Pendiente ── */}
+        {sol?.status === 'pendiente' && (
+          <>
+            <Animated.View
+              style={[styles.iconCircle, styles.amberCircle, { transform: [{ scale: pulse }] }]}
+            >
+              <Ionicons name="time-outline" size={52} color={C.amber} />
+            </Animated.View>
+
+            <Text style={styles.title}>Solicitud enviada</Text>
+            <Text style={styles.subtitle}>Tu solicitud está siendo revisada</Text>
+
+            <View style={styles.infoCard}>
+              <Text style={styles.infoName}>{sol.name}</Text>
+              <Text style={styles.infoRole}>{roleLabel}</Text>
+            </View>
+
+            <Text style={styles.hint}>
+              El administrador te responderá en menos de 24 horas
+            </Text>
+          </>
+        )}
+
+        {/* ── Aprobada ── */}
+        {sol?.status === 'aprobada' && (
+          <>
+            <View style={[styles.iconCircle, styles.greenCircle]}>
+              <Ionicons name="checkmark-circle" size={60} color={C.green} />
+            </View>
+
+            <Text style={styles.title}>¡Fuiste aprobado!</Text>
+            <Text style={styles.subtitle}>Ya puedes ingresar a tu dashboard</Text>
+
+            <View style={styles.infoCard}>
+              <Text style={styles.infoName}>{sol.name}</Text>
+              <Text style={styles.infoRole}>{roleLabel}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              activeOpacity={0.85}
+              onPress={handleEntrar}
+            >
+              <Ionicons name="enter-outline" size={22} color={C.white} />
+              <Text style={styles.primaryBtnText}>Entrar al dashboard</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* ── Rechazada ── */}
+        {sol?.status === 'rechazada' && (
+          <>
+            <View style={[styles.iconCircle, styles.redCircle]}>
+              <Ionicons name="close-circle" size={60} color={C.red} />
+            </View>
+
+            <Text style={styles.title}>Solicitud rechazada</Text>
+            <Text style={styles.subtitle}>Tu solicitud no fue aprobada</Text>
+
+            {sol.rejectionReason ? (
+              <View style={styles.rejectionCard}>
+                <Ionicons name="alert-circle-outline" size={18} color={C.red} />
+                <Text style={styles.rejectionText}>{sol.rejectionReason}</Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              activeOpacity={0.85}
+              onPress={handleReintentar}
+            >
+              <Ionicons name="refresh-outline" size={20} color={C.white} />
+              <Text style={styles.secondaryBtnText}>Volver a enviar solicitud</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
       </View>
     </SafeAreaView>
   );
@@ -192,7 +191,24 @@ export default function SolicitudPendienteScreen({ navigation, route }: Props) {
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: C.bg },
+  safe: { flex: 1, backgroundColor: C.bg },
+
+  // Barra superior con botón atrás
+  topBar: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Área central de contenido
   center: {
     flex: 1,
     alignItems: 'center',
@@ -316,16 +332,10 @@ const styles = StyleSheet.create({
     color: C.white,
   },
 
-  // Fallback
+  // Fallback (solicitud no encontrada)
   softText: {
     fontSize: 15,
     color: C.soft,
     textAlign: 'center',
-  },
-  linkBtn:  { marginTop: 12 },
-  linkText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: C.white,
   },
 });
