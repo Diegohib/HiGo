@@ -18,7 +18,8 @@ import TransportistaPayScreen        from '../screens/TransportistaPayScreen';
 import AdminPayScreen                from '../screens/AdminPayScreen';
 import AdminSolicitudesScreen       from '../screens/AdminSolicitudesScreen';
 import AdminFinanzasScreen          from '../screens/AdminFinanzasScreen';
-import ComercianteDashboardScreen   from '../screens/ComercianteDashboardScreen';
+import ComercianteDashboardScreen    from '../screens/ComercianteDashboardScreen';
+import SolicitudPendienteScreen      from '../screens/SolicitudPendienteScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -32,6 +33,16 @@ const HEADER_OPTS = {
 export default function AppNavigator() {
   const user = useAuthStore((s) => s.user);
   const [hydrated, setHydrated] = useState(false);
+
+  function getInitialRoute(): keyof RootStackParamList {
+    if (!user) return 'Splash';
+    switch (user.role) {
+      case 'cochero':       return 'CocheroDashboard';
+      case 'transportista': return 'TransportistaDashboard';
+      case 'comerciante':   return 'ComercianteDashboard';
+      default:              return 'MainTabs';
+    }
+  }
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
@@ -47,8 +58,8 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        key={user ? 'authed' : 'guest'}
-        initialRouteName={user ? 'MainTabs' : 'Splash'}
+        key={user ? `authed-${user.role}` : 'guest'}
+        initialRouteName={getInitialRoute()}
         screenOptions={{ headerShown: false }}
       >
         {/* Pantalla de entrada */}
@@ -77,6 +88,11 @@ export default function AppNavigator() {
           name="StaffRegister"
           component={StaffRegisterScreen}
           options={{ ...HEADER_OPTS, headerShown: true, title: 'Registro' }}
+        />
+        <Stack.Screen
+          name="SolicitudPendiente"
+          component={SolicitudPendienteScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="CocheroDashboard"

@@ -8,7 +8,8 @@ export type RootStackParamList = {
   // Flujo personal operativo
   Login: undefined;
   RoleSelection: undefined;
-  StaffRegister: { role: StaffRole };
+  StaffRegister:      { role: StaffRole };
+  SolicitudPendiente: { solicitudId: string };
   // Dashboard cochero
   CocheroDashboard: undefined;
   // Dashboard transportista

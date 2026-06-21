@@ -6,14 +6,16 @@ export type SolicitudStatus = 'pendiente' | 'aprobada' | 'rechazada';
 export type SolicitudRole   = 'cochero' | 'transportista' | 'comerciante';
 
 export interface Solicitud {
-  id:              string;
-  name:            string;
-  phone:           string;
-  role:            SolicitudRole;
-  requestedAt:     Date;
-  avatar:          string;   // emoji representativo
-  documents:       string[]; // nombres de documentos adjuntos
-  status:          SolicitudStatus;
+  id:               string;
+  name:             string;
+  phone:            string;
+  email?:           string;
+  role:             SolicitudRole;
+  requestedAt:      Date;
+  avatar:           string;
+  documents:        string[];
+  extraData:        Record<string, string>;
+  status:           SolicitudStatus;
   rejectionReason?: string;
 }
 
@@ -39,6 +41,7 @@ const MOCK_SOLICITUDES: Solicitud[] = [
     requestedAt: new Date('2026-04-17T09:15:00'),
     avatar: '🚲',
     documents: ['Foto de cédula', 'Foto de perfil'],
+    extraData: { cedula: '1712345678', numCoche: '012' },
     status: 'pendiente',
   },
   {
@@ -49,6 +52,7 @@ const MOCK_SOLICITUDES: Solicitud[] = [
     requestedAt: new Date('2026-04-17T11:30:00'),
     avatar: '🚚',
     documents: ['Foto de cédula', 'Foto de matrícula', 'Foto de perfil'],
+    extraData: { cedula: '1798765432' },
     status: 'pendiente',
   },
   {
@@ -59,6 +63,7 @@ const MOCK_SOLICITUDES: Solicitud[] = [
     requestedAt: new Date('2026-04-17T14:05:00'),
     avatar: '🏪',
     documents: ['Foto de cédula', 'Foto de perfil'],
+    extraData: { cedula: '1756473829', stallNumber: '07', giro: 'Frutas' },
     status: 'pendiente',
   },
   {
@@ -69,6 +74,7 @@ const MOCK_SOLICITUDES: Solicitud[] = [
     requestedAt: new Date('2026-04-18T08:20:00'),
     avatar: '🚲',
     documents: ['Foto de cédula', 'Foto de perfil'],
+    extraData: { cedula: '1734561290', numCoche: '027' },
     status: 'pendiente',
   },
   {
@@ -79,6 +85,7 @@ const MOCK_SOLICITUDES: Solicitud[] = [
     requestedAt: new Date('2026-04-18T10:45:00'),
     avatar: '🚚',
     documents: ['Foto de cédula', 'Foto de matrícula', 'Foto de perfil'],
+    extraData: { cedula: '1723456781' },
     status: 'pendiente',
   },
   {
@@ -89,6 +96,7 @@ const MOCK_SOLICITUDES: Solicitud[] = [
     requestedAt: new Date('2026-04-18T13:10:00'),
     avatar: '🏪',
     documents: ['Foto de cédula', 'Foto de perfil'],
+    extraData: { cedula: '1745678923', stallNumber: '14', giro: 'Verduras' },
     status: 'pendiente',
   },
 ];
@@ -96,13 +104,25 @@ const MOCK_SOLICITUDES: Solicitud[] = [
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 interface AdminSolicitudesState {
-  solicitudes:  Solicitud[];
-  aprobar:      (id: string) => void;
-  rechazar:     (id: string, reason: RejectionReason) => void;
+  solicitudes:       Solicitud[];
+  agregarSolicitud:  (data: Omit<Solicitud, 'id' | 'requestedAt' | 'status'>) => string;
+  aprobar:           (id: string) => void;
+  rechazar:          (id: string, reason: RejectionReason) => void;
 }
 
 export const useAdminSolicitudesStore = create<AdminSolicitudesState>((set) => ({
   solicitudes: MOCK_SOLICITUDES,
+
+  agregarSolicitud: (data) => {
+    const id = `sol_${Date.now()}`;
+    set((s) => ({
+      solicitudes: [
+        ...s.solicitudes,
+        { ...data, id, requestedAt: new Date(), status: 'pendiente' },
+      ],
+    }));
+    return id;
+  },
 
   aprobar: (id) =>
     set((s) => ({

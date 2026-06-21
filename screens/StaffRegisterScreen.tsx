@@ -1,10 +1,11 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList, StaffRole } from '../navigation/types';
 import { useAuthStore } from '../store/authStore';
+import { useAdminSolicitudesStore } from '../store/adminSolicitudesStore';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'StaffRegister'>;
@@ -181,18 +182,61 @@ function GiroPicker({
 
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 
+const PHOTO_LABELS: Record<PhotoUploadKey, string> = {
+  cedula:   'Foto de cédula',
+  matricula:'Foto de matrícula',
+  selfie:   'Foto de perfil',
+};
+
 export default function StaffRegisterScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const config = ROLE_CONFIG[role];
   const user = useAuthStore((s) => s.user);
+  const agregarSolicitud = useAdminSolicitudesStore((s) => s.agregarSolicitud);
 
-  const [name,       setName]       = useState(user?.name  ?? '');
-  const [phone,      setPhone]      = useState((user as any)?.phone ?? '');
-  const [uploaded,   setUploaded]   = useState<Partial<Record<PhotoUploadKey, boolean>>>({});
+  const [name,        setName]        = useState(user?.name  ?? '');
+  const [phone,       setPhone]       = useState((user as any)?.phone ?? '');
+  const [extraValues, setExtraValues] = useState<Record<string, string>>({});
+  const [uploaded,    setUploaded]    = useState<Partial<Record<PhotoUploadKey, boolean>>>({});
   const [selectedGiro, setSelectedGiro] = useState<string | null>(null);
 
   function toggleUpload(key: PhotoUploadKey) {
     setUploaded(prev => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function handleSubmit() {
+    if (!name.trim() || !phone.trim()) {
+      Alert.alert('Campos incompletos', 'Por favor completa nombre y teléfono.');
+      return;
+    }
+    for (const field of config.extraFields) {
+      if (field.type === 'text' && !extraValues[field.key]?.trim()) {
+        Alert.alert('Campos incompletos', `Por favor completa: ${field.placeholder}`);
+        return;
+      }
+      if (field.type === 'picker' && !selectedGiro) {
+        Alert.alert('Campos incompletos', `Por favor selecciona ${field.label}`);
+        return;
+      }
+    }
+
+    const documents = (Object.keys(uploaded) as PhotoUploadKey[])
+      .filter((k) => uploaded[k])
+      .map((k) => PHOTO_LABELS[k]);
+
+    const extraData: Record<string, string> = { ...extraValues };
+    if (selectedGiro) extraData.giro = selectedGiro;
+
+    const solicitudId = agregarSolicitud({
+      name:      name.trim(),
+      phone:     phone.trim(),
+      role,
+      avatar:    config.icon,
+      documents,
+      extraData,
+    });
+
+    navigation.navigate('SolicitudPendiente', { solicitudId });
   }
 
   return (
@@ -254,6 +298,8 @@ export default function StaffRegisterScreen({ navigation, route }: Props) {
               keyboardType={field.keyboardType ?? 'default'}
               maxLength={field.maxLength}
               autoCapitalize={field.autoCapitalize ?? 'none'}
+              value={extraValues[field.key] ?? ''}
+              onChangeText={(v) => setExtraValues(prev => ({ ...prev, [field.key]: v }))}
             />
           );
         })}
@@ -276,6 +322,7 @@ export default function StaffRegisterScreen({ navigation, route }: Props) {
         <TouchableOpacity
           style={[styles.submitButton, { backgroundColor: config.color }]}
           activeOpacity={0.85}
+          onPress={handleSubmit}
         >
           <Ionicons name="paper-plane-outline" size={20} color="#FFFFFF" />
           <Text style={styles.submitButtonText}>Enviar solicitud</Text>
