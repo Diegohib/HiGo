@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -110,31 +112,46 @@ interface AdminSolicitudesState {
   rechazar:          (id: string, reason: RejectionReason) => void;
 }
 
-export const useAdminSolicitudesStore = create<AdminSolicitudesState>((set) => ({
-  solicitudes: MOCK_SOLICITUDES,
+export const useAdminSolicitudesStore = create<AdminSolicitudesState>()(
+  persist(
+    (set) => ({
+      solicitudes: MOCK_SOLICITUDES,
 
-  agregarSolicitud: (data) => {
-    const id = `sol_${Date.now()}`;
-    set((s) => ({
-      solicitudes: [
-        ...s.solicitudes,
-        { ...data, id, requestedAt: new Date(), status: 'pendiente' },
-      ],
-    }));
-    return id;
-  },
+      agregarSolicitud: (data) => {
+        const id = `sol_${Date.now()}`;
+        set((s) => ({
+          solicitudes: [
+            ...s.solicitudes,
+            { ...data, id, requestedAt: new Date(), status: 'pendiente' },
+          ],
+        }));
+        return id;
+      },
 
-  aprobar: (id) =>
-    set((s) => ({
-      solicitudes: s.solicitudes.map((sol) =>
-        sol.id === id ? { ...sol, status: 'aprobada', rejectionReason: undefined } : sol
-      ),
-    })),
+      aprobar: (id) =>
+        set((s) => ({
+          solicitudes: s.solicitudes.map((sol) =>
+            sol.id === id ? { ...sol, status: 'aprobada', rejectionReason: undefined } : sol
+          ),
+        })),
 
-  rechazar: (id, reason) =>
-    set((s) => ({
-      solicitudes: s.solicitudes.map((sol) =>
-        sol.id === id ? { ...sol, status: 'rechazada', rejectionReason: reason } : sol
-      ),
-    })),
-}));
+      rechazar: (id, reason) =>
+        set((s) => ({
+          solicitudes: s.solicitudes.map((sol) =>
+            sol.id === id ? { ...sol, status: 'rechazada', rejectionReason: reason } : sol
+          ),
+        })),
+    }),
+    {
+      name: 'higo-solicitudes',
+      storage: createJSONStorage(() => AsyncStorage, {
+        reviver: (key, value) => {
+          if (key === 'requestedAt' && typeof value === 'string') {
+            return new Date(value);
+          }
+          return value;
+        },
+      }),
+    }
+  )
+);
