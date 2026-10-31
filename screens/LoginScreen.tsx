@@ -1,28 +1,37 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Pressable, Alert } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, TextInput as RNTextInput } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
+import { useAuthStore } from '../store/authStore';
+import {
+  AuthScreen,
+  AuthField,
+  AuthPrimaryButton,
+  AuthSecondaryButton,
+  AuthDivider,
+  AuthTextLink,
+  AuthNotice,
+} from '../components/AuthLayout';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'Login'>;
 };
 
-// ─── Usuarios mock de prueba ──────────────────────────────────────────────────
-
-const MOCK_USERS: { email: string; password: string; dashboard: keyof RootStackParamList }[] = [
-  { email: 'cochero@higo.com',       password: '123456', dashboard: 'CocheroDashboard'       },
-  { email: 'transportista@higo.com', password: '123456', dashboard: 'TransportistaDashboard' },
-  { email: 'admin@higo.com',         password: '123456', dashboard: 'AdminDashboard'         },
-  { email: 'comerciante@higo.com',   password: '123456', dashboard: 'ComercianteDashboard'   },
-];
-
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function LoginScreen({ navigation }: Props) {
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
+  const [email,        setEmail]        = useState('');
+  const [password,     setPassword]     = useState('');
+  const [loggingIn,    setLoggingIn]    = useState(false);
+  const [resetMode,      setResetMode]      = useState(false);
+  const [resetSubmitting,setResetSubmitting]= useState(false);
+  const [resetMsg,       setResetMsg]       = useState<string | null>(null);
+  const login = useAuthStore((s) => s.login);
+  const resetPassword = useAuthStore((s) => s.resetPassword);
 
-  function handleLogin() {
+  const passwordRef = useRef<RNTextInput>(null);
+
+  async function handleLogin() {
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!trimmedEmail || !password) {
@@ -30,143 +39,113 @@ export default function LoginScreen({ navigation }: Props) {
       return;
     }
 
-    const user = MOCK_USERS.find(
-      (u) => u.email === trimmedEmail && u.password === password
-    );
+    setLoggingIn(true);
+    try {
+      await login(trimmedEmail, password);
+      // AppNavigator escucha la sesión y redirige solo al dashboard correcto;
+      // esta alerta queda arriba de esa pantalla como confirmación explícita.
+      Alert.alert('¡Bienvenido de nuevo!', 'Sesión iniciada correctamente.');
+    } catch (error: any) {
+      const message =
+        error?.code === 'auth/invalid-credential' || error?.code === 'auth/wrong-password' || error?.code === 'auth/user-not-found'
+          ? 'El correo o la contraseña no coinciden.'
+          : error?.code === 'auth/too-many-requests'
+          ? 'Demasiados intentos. Probá de nuevo en unos minutos.'
+          : 'No se pudo iniciar sesión. Intentá de nuevo.';
+      Alert.alert('Error al iniciar sesión', message);
+    } finally {
+      setLoggingIn(false);
+    }
+  }
 
-    if (!user) {
-      Alert.alert('Credenciales incorrectas', 'El correo o la contraseña no coinciden.');
+  async function handleReset() {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      Alert.alert('Falta el correo', 'Ingresá tu correo para enviarte el enlace.');
       return;
     }
+    setResetSubmitting(true);
+    setResetMsg(null);
+    try {
+      await resetPassword(trimmedEmail);
+    } catch {
+      // Firebase no revela si el correo existe o no — se muestra el mismo
+      // mensaje siempre, así no se puede usar esto para buscar cuentas.
+    } finally {
+      setResetSubmitting(false);
+      setResetMsg('Si ese correo tiene una cuenta, te enviamos un enlace para restablecer la contraseña.');
+    }
+  }
 
-    navigation.reset({ index: 0, routes: [{ name: user.dashboard }] });
+  function enterResetMode(on: boolean) {
+    setResetMode(on);
+    setResetMsg(null);
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.logo}>HiGo</Text>
-        <Text style={styles.subtitle}>Iniciá sesión en tu cuenta</Text>
-      </View>
-
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Correo electrónico"
-          placeholderTextColor="#999"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          placeholderTextColor="#999"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        <TouchableOpacity
-          style={styles.loginButton}
-          activeOpacity={0.85}
-          onPress={handleLogin}
-        >
-          <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
-        </TouchableOpacity>
-
-        <Pressable
-          style={({ pressed }) => [styles.registerLinkWrapper, pressed && { opacity: 0.6 }]}
-          onPress={() => navigation.navigate('RoleSelection')}
-        >
-          <Text style={styles.registerLink}>
-            <Text style={styles.registerLinkBold}>Seleccioná tu rol para registrarte</Text>
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.adminLinkWrapper, pressed && { opacity: 0.6 }]}
-          onPress={() => navigation.navigate('AdminDashboard')}
-        >
-          <Text style={styles.adminLink}>💼 Acceso administrador</Text>
-        </Pressable>
-      </View>
-    </View>
+    <AuthScreen
+      eyebrow={resetMode ? 'Recuperar acceso' : 'Bienvenido'}
+      title={resetMode ? 'Restablecé tu contraseña' : 'Iniciá sesión'}
+      subtitle={resetMode ? 'Te enviamos un enlace a tu correo.' : 'Lo mejor del Mercado Mayorista, a un toque.'}
+      onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+    >
+      {resetMode ? (
+        <>
+          <AuthField
+            label="Correo electrónico"
+            icon="mail-outline"
+            placeholder="tu@correo.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            textContentType="emailAddress"
+            autoComplete="email"
+            returnKeyType="send"
+            onSubmitEditing={handleReset}
+            value={email}
+            onChangeText={setEmail}
+          />
+          {resetMsg && <AuthNotice text={resetMsg} />}
+          <AuthPrimaryButton label="Enviar enlace" loading={resetSubmitting} onPress={handleReset} />
+          <AuthTextLink label="Volver a iniciar sesión" icon="arrow-back" onPress={() => enterResetMode(false)} />
+        </>
+      ) : (
+        <>
+          <AuthField
+            label="Correo electrónico"
+            icon="mail-outline"
+            placeholder="tu@correo.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            textContentType="emailAddress"
+            autoComplete="email"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            value={email}
+            onChangeText={setEmail}
+          />
+          <AuthField
+            ref={passwordRef}
+            label="Contraseña"
+            labelAction={{ text: '¿La olvidaste?', onPress: () => enterResetMode(true) }}
+            icon="lock-closed-outline"
+            placeholder="••••••••"
+            secure
+            textContentType="password"
+            autoComplete="password"
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <AuthPrimaryButton label="Iniciar sesión" loading={loggingIn} onPress={handleLogin} />
+          <AuthDivider text="¿Primera vez en HiGo?" />
+          <AuthSecondaryButton
+            label="Crear una cuenta"
+            icon="person-add-outline"
+            onPress={() => navigation.navigate('RoleSelection')}
+          />
+        </>
+      )}
+    </AuthScreen>
   );
 }
-
-// ─── Estilos ──────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#3D1F8B',
-    paddingHorizontal: 32,
-    paddingTop: 80,
-    paddingBottom: 40,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 48,
-  },
-  logo: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 2,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    opacity: 0.8,
-  },
-  form: {
-    gap: 16,
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: '#1A1A1A',
-  },
-  loginButton: {
-    backgroundColor: '#2ECC71',
-    borderRadius: 14,
-    paddingVertical: 18,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  registerLinkWrapper: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  registerLink: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  registerLinkBold: {
-    fontWeight: '700',
-    opacity: 1,
-    textDecorationLine: 'underline',
-  },
-  adminLinkWrapper: {
-    alignItems: 'center',
-    paddingVertical: 8,
-    marginTop: 4,
-  },
-  adminLink: {
-    color: '#C9B8FF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-});

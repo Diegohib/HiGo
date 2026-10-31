@@ -1,22 +1,35 @@
 import {
+  useState,
+  useEffect,
+  useRef } from 'react';
+import {
   StyleSheet,
-  Text,
   View,
   ScrollView,
-  TextInput,
   TouchableOpacity,
+  Pressable,
+  Image,
   SafeAreaView,
   StatusBar,
-  Dimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Text from '../components/Text';
+import TextInput from '../components/TextInput';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { HomeStackParamList, RootStackParamList, TabParamList } from '../navigation/types';
-import { CATEGORIES, PRODUCTS } from '../data/products';
+import { useProductsStore, useDisplayCategories } from '../store/productsStore';
+import { Category, Product } from '../data/products';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
+import { useThemeColors } from '../theme/useThemeColors';
+import { ThemeColors } from '../theme/colors';
+import { RADIUS, SPACING, cardShadow, floatingShadow } from '../theme/elevation';
+import { getCategoryIcon } from '../theme/categoryIcons';
+import Avatar from '../components/Avatar';
+import HiGoLogo from '../components/HiGoLogo';
 
 type Props = {
   navigation: CompositeNavigationProp<
@@ -28,176 +41,295 @@ type Props = {
   >;
 };
 
-type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+const FEATURED_COUNT = 8;
 
-const CATEGORY_ICONS: Record<string, IoniconName> = {
-  tuberculos: 'nutrition-outline',
-  frutas:     'leaf-outline',
-  verduras:   'flower-outline',
-  abarrotes:  'basket-outline',
-};
-
-const CARD_WIDTH = (Dimensions.get('window').width - 18 * 2 - 12) / 2;
-
-const BESTSELLERS = PRODUCTS.slice(0, 3);
+function greetingPrefix(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Buenos días';
+  if (h < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
 
 export default function HomeScreen({ navigation }: Props) {
+  const C = useThemeColors();
+  const styles = makeStyles(C);
   const totalItems = useCartStore(s => s.totalItems);
-  const user       = useAuthStore(s => s.user);
+  const cartTotal   = useCartStore(s => s.items.reduce((sum, i) => sum + i.presentationPrice * i.quantity, 0));
+  const user        = useAuthStore(s => s.user);
+  const categories  = useDisplayCategories();
+  const products    = useProductsStore(s => s.products);
+  const [search, setSearch] = useState('');
 
   const greeting = user?.name
-    ? `Hola, ${user.name.split(' ')[0]} 👋`
-    : 'Bienvenido a HiGo';
+    ? `${greetingPrefix()}, ${user.name.split(' ')[0]}`
+    : greetingPrefix();
+
+  const featured = products.slice(0, FEATURED_COUNT);
+
+  // Al cliente nuevo se le pide la dirección una sola vez por sesión de la
+  // app (se puede omitir); si ya la tiene guardada o ya la saltó, no se
+  // vuelve a interrumpir.
+  const promptedAddressRef = useRef(false);
+  useEffect(() => {
+    if (promptedAddressRef.current) return;
+    if (!user || user.role !== 'cliente') return;
+    if (user.address || user.addressSkipped) return;
+    promptedAddressRef.current = true;
+    navigation.navigate('AddressSetup', {});
+  }, [user]);
+
+  function openCategory(cat: Category) {
+    navigation.navigate('Catalog', {
+      categoryId: cat.id,
+      categoryName: cat.name,
+      categoryEmoji: cat.emoji,
+      categoryColor: cat.color,
+    });
+  }
+
+  function openProduct(product: Product) {
+    navigation.navigate('Product', { productId: product.id });
+  }
+
+  function openFullCatalog() {
+    navigation.navigate('Catalog', {});
+  }
+
+  // Al buscar desde Inicio, los resultados se muestran en el catálogo general.
+  function handleSearchSubmit() {
+    const q = search.trim();
+    if (q) navigation.navigate('Catalog', { initialSearch: q });
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#3D1F8B" />
+      <StatusBar barStyle={C.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerBtn}
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate('Splash')}
-        >
-          <Ionicons name="home-outline" size={22} color="#FFFFFF" />
-        </TouchableOpacity>
+      <LinearGradient colors={C.headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <View style={styles.headerTop}>
+          <HiGoLogo size={34} color="#FFFFFF" />
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('Cuenta')}
+            >
+              <Avatar name={user?.name} photoUri={user?.photoUri} size={38} bg="rgba(255,255,255,0.2)" textColor="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerBtn}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('Carrito')}
+            >
+              <Ionicons name="cart-outline" size={22} color="#FFFFFF" />
+              {totalItems > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{totalItems > 99 ? '99+' : totalItems}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        <Text style={styles.headerTitle}>HiGo</Text>
+        <Text style={styles.greeting}>{greeting}</Text>
+        <Text style={styles.greetingSub}>¿Qué vas a pedir hoy?</Text>
+      </LinearGradient>
 
-        <TouchableOpacity
-          style={styles.headerBtn}
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate('Carrito')}
-        >
-          <Ionicons name="cart-outline" size={24} color="#FFFFFF" />
-          {totalItems > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{totalItems > 99 ? '99+' : totalItems}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+      {/* ── Búsqueda flotante (a caballo entre el header y el contenido) ── */}
+      <View style={styles.searchWrapper}>
+        <View style={styles.searchIconBox}>
+          <Ionicons name="search-outline" size={16} color={C.primary} />
+        </View>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar tomates, papas, cebollas..."
+          placeholderTextColor={C.textFaint}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          onSubmitEditing={handleSearchSubmit}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} activeOpacity={0.7}>
+            <Ionicons name="close-circle" size={18} color={C.textFaint} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, totalItems > 0 && { paddingBottom: 96 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Saludo ── */}
-        <Text style={styles.greeting}>{greeting}</Text>
-        <Text style={styles.greetingSub}>¿Qué vas a pedir hoy?</Text>
-
-        {/* ── Búsqueda ── */}
-        <View style={styles.searchWrapper}>
-          <Ionicons name="search-outline" size={18} color="#9B8EC4" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar tomates, papas, cebollas..."
-            placeholderTextColor="#9B8EC4"
-          />
-        </View>
-
-        {/* ── Categorías ── */}
-        <Text style={styles.sectionTitle}>Categorías</Text>
-        <View style={styles.grid}>
-          {CATEGORIES.map((cat) => {
-            const icon = CATEGORY_ICONS[cat.id] ?? 'grid-outline';
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                style={[styles.categoryCard, { backgroundColor: cat.color }]}
-                activeOpacity={0.82}
-                onPress={() => navigation.navigate('Catalog', {
-                  categoryId:    cat.id,
-                  categoryName:  cat.name,
-                  categoryEmoji: cat.emoji,
-                  categoryColor: cat.color,
-                })}
-              >
-                <View style={styles.iconCircle}>
-                  <Ionicons name={icon} size={30} color="#FFFFFF" />
-                </View>
-                <Text style={styles.categoryName}>{cat.name}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* ── Más vendidos ── */}
-        <Text style={styles.sectionTitle}>Más vendidos</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.bestsellersRow}
+        {/* ── Hero: horarios de entrega, con más presencia gráfica ── */}
+        <LinearGradient
+          colors={[C.headerGradient[1], C.headerGradient[0]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.hero}
         >
-          {BESTSELLERS.map((product) => {
-            const base = product.presentations[0];
-            const cat  = CATEGORIES.find(c => c.id === product.categoryId);
-            return (
-              <TouchableOpacity
-                key={product.id}
-                style={styles.productCard}
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('Product', { productId: product.id })}
-              >
-                <View style={[styles.productIconBox, { backgroundColor: cat?.color ?? '#3D1F8B' }]}>
-                  <Text style={styles.productEmoji}>{product.emoji}</Text>
-                </View>
-                <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-                <Text style={styles.productPrice}>
-                  ${base.price.toFixed(2)}
-                  <Text style={styles.productUnit}> / {base.label}</Text>
-                </Text>
-                <View style={styles.addBtn}>
-                  <Ionicons name="add" size={18} color="#3D1F8B" />
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* ── Banner horarios ── */}
-        <View style={styles.banner}>
-          <View style={styles.bannerIconBox}>
-            <Ionicons name="time-outline" size={28} color="#3D1F8B" />
+          <View style={styles.heroBlob} pointerEvents="none" />
+          <Ionicons
+            name="basket"
+            size={116}
+            color="rgba(255,255,255,0.14)"
+            style={styles.heroIconGhost}
+          />
+          <View style={styles.heroIconBox}>
+            <Ionicons name="time-outline" size={24} color="#FFFFFF" />
           </View>
-          <View style={styles.bannerText}>
-            <Text style={styles.bannerTitle}>Horarios de entrega</Text>
-            <View style={styles.bannerSlots}>
-              <View style={styles.slot}>
-                <Ionicons name="sunny-outline" size={14} color="#3D1F8B" />
-                <Text style={styles.slotText}>10:00 – 12:00</Text>
-              </View>
-              <View style={styles.slotDivider} />
-              <View style={styles.slot}>
-                <Ionicons name="partly-sunny-outline" size={14} color="#3D1F8B" />
-                <Text style={styles.slotText}>14:00 – 16:00</Text>
-              </View>
+          <Text style={styles.heroTitle}>Horarios de entrega</Text>
+          <View style={styles.heroSlots}>
+            <View style={styles.slotPill}>
+              <Ionicons name="sunny-outline" size={13} color="#FFFFFF" />
+              <Text style={styles.slotText}>10:00 – 12:00</Text>
+            </View>
+            <View style={styles.slotPill}>
+              <Ionicons name="partly-sunny-outline" size={13} color="#FFFFFF" />
+              <Text style={styles.slotText}>14:00 – 16:00</Text>
             </View>
           </View>
+        </LinearGradient>
+
+        {/* ── Categorías: tarjeta clara + ícono + nombre, estilo apps de
+             delivery (PedidosYa, Rappi) — sin foto ni degradado: son livianas,
+             no dependen de que cargue nada por red, y se ven bien desde el
+             primer segundo aunque el catálogo todavía no tenga fotos reales. ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Categorías</Text>
+          <Pressable onPress={openFullCatalog}>
+            <Text style={styles.sectionLink}>Ver todo</Text>
+          </Pressable>
         </View>
+        <View style={styles.categoryGrid}>
+          {categories.map((cat) => (
+            <TouchableOpacity
+              key={cat.id}
+              style={styles.categoryTile}
+              activeOpacity={0.8}
+              onPress={() => openCategory(cat)}
+            >
+              <View style={[styles.categoryTileIconWrap, { backgroundColor: cat.color + '1E' }]}>
+                <MaterialCommunityIcons name={getCategoryIcon(cat.id)} size={28} color={cat.color} />
+              </View>
+              <Text style={styles.categoryTileName} numberOfLines={1}>{cat.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── Destacados: grilla 2 columnas, más productos de un vistazo ──
+             La sección siempre se muestra (con un aviso si todavía no hay
+             productos) — que desapareciera del todo dejaba la pantalla de
+             inicio con una sensación de "vacío" apenas se abría la app. ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Destacados</Text>
+          <Pressable onPress={openFullCatalog}>
+            <Text style={styles.sectionLink}>Ver todo</Text>
+          </Pressable>
+        </View>
+        {featured.length === 0 ? (
+          <View style={styles.comingSoonCard}>
+            <Ionicons name="storefront-outline" size={30} color={C.primary} />
+            <Text style={styles.comingSoonTitle}>Muy pronto</Text>
+            <Text style={styles.comingSoonText}>
+              Estamos subiendo los productos del mercado. ¡Volvé pronto!
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.productGrid}>
+              {featured.map((product) => {
+                const base = product.presentations[0];
+                const cat = categories.find((c) => c.id === product.categoryId);
+                return (
+                  <TouchableOpacity
+                    key={product.id}
+                    style={styles.productCard}
+                    activeOpacity={0.85}
+                    onPress={() => openProduct(product)}
+                  >
+                    <View style={styles.productImageWrapper}>
+                      <Image source={{ uri: product.image }} style={styles.productImage} resizeMode="cover" />
+                      {cat && (
+                        <View style={[styles.productTag, { backgroundColor: cat.color }]}>
+                          <Text style={styles.productTagText}>{cat.name}</Text>
+                        </View>
+                      )}
+                      <View style={styles.productAddBtn}>
+                        <Ionicons name="add" size={16} color={C.primary} />
+                      </View>
+                    </View>
+                    <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+                    {base && (
+                      <Text style={styles.productPrice}>
+                        ${base.price.toFixed(2)}
+                        <Text style={styles.productUnit}> / {base.label}</Text>
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
       </ScrollView>
+
+      {/* ── Barra fija del carrito ── */}
+      {totalItems > 0 && (
+        <TouchableOpacity
+          style={styles.cartBar}
+          activeOpacity={0.9}
+          onPress={() => navigation.navigate('Carrito')}
+        >
+          <View style={styles.cartBarLeft}>
+            <View style={styles.cartBarCount}>
+              <Text style={styles.cartBarCountText}>{totalItems}</Text>
+            </View>
+            <Text style={styles.cartBarLabel}>Ver carrito</Text>
+          </View>
+          <View style={styles.cartBarRight}>
+            <Text style={styles.cartBarTotal}>${cartTotal.toFixed(2)}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#3D1F8B',
+    // Coincide con el primer color del degradado del header (no con
+    // C.primary a secas) — si no, en oscuro se nota una franja más clara
+    // justo detrás de la barra de estado, antes de que arranque el header.
+    backgroundColor: C.headerGradient[0],
   },
 
   // Header
   header: {
-    backgroundColor: '#3D1F8B',
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 34,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    marginBottom: 22,
+  },
+  headerLogo: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.6,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   headerBtn: {
     width: 40,
@@ -206,12 +338,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  headerTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 1,
   },
   badge: {
     position: 'absolute',
@@ -225,18 +351,58 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderWidth: 2,
-    borderColor: '#3D1F8B',
+    borderColor: '#FFFFFF',
   },
   badgeText: {
     color: '#FFFFFF',
     fontSize: 9,
     fontWeight: '800',
   },
+  greeting: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 4,
+    letterSpacing: -0.3,
+  },
+  greetingSub: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.8,
+  },
+
+  // Búsqueda flotante — se superpone al límite entre el header y el sheet
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: C.surface,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    marginHorizontal: 18,
+    marginTop: -26,
+    zIndex: 2,
+    ...floatingShadow(C),
+  },
+  searchIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: C.primaryFaint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: C.text,
+  },
 
   // Scroll
   scroll: {
     flex: 1,
-    backgroundColor: '#F7F5FF',
+    backgroundColor: C.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
@@ -246,182 +412,253 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
 
-  // Saludo
-  greeting: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  greetingSub: {
-    fontSize: 14,
-    color: '#9B8EC4',
-    marginBottom: 20,
-  },
-
-  // Búsqueda
-  searchWrapper: {
+  // Sección title
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0EEFF',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    marginBottom: 26,
-    borderWidth: 1,
-    borderColor: '#E0D9F5',
-  },
-  searchIcon: { marginRight: 8 },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1A1A1A',
-  },
-
-  // Sección title
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
+    justifyContent: 'space-between',
     marginBottom: 14,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: C.text,
+    letterSpacing: -0.3,
+  },
+  sectionLink: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.primary,
+  },
 
-  // Grid categorías
-  grid: {
+  // Placeholder de "Destacados" mientras no hay productos reales cargados.
+  comingSoonCard: {
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: C.surface,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    marginBottom: 28,
+    ...cardShadow(C),
+  },
+  comingSoonTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: C.text,
+    marginTop: 2,
+  },
+  comingSoonText: {
+    fontSize: 13,
+    color: C.textFaint,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  // Hero de horarios — degradado con blob + ícono fantasma grande de fondo,
+  // en vez de la barra plana chica de antes.
+  hero: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: RADIUS.xl,
+    padding: SPACING.xl,
+    marginBottom: 28,
+    ...floatingShadow(C, C.primary),
+  },
+  heroBlob: {
+    position: 'absolute',
+    top: -50,
+    left: -40,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  heroIconGhost: {
+    position: 'absolute',
+    right: -18,
+    bottom: -22,
+    transform: [{ rotate: '-12deg' }],
+  },
+  heroIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  heroTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 12,
+    letterSpacing: -0.2,
+  },
+  heroSlots: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  slotPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  slotText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  // Cuadrícula de categorías: tarjeta clara + ícono + nombre (sin foto ni
+  // degradado — livianas y siempre visibles desde el primer render).
+  categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
     marginBottom: 28,
   },
-  categoryCard: {
-    width: CARD_WIDTH,
-    borderRadius: 18,
-    paddingVertical: 22,
+  categoryTile: {
+    width: '47%',
     alignItems: 'center',
     gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.14,
-    shadowRadius: 6,
-    elevation: 3,
+    backgroundColor: C.surface,
+    borderRadius: RADIUS.lg,
+    paddingVertical: 18,
+    paddingHorizontal: 10,
+    ...cardShadow(C),
   },
-  iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+  categoryTileIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: RADIUS.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  categoryName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  categoryTileName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: C.text,
   },
 
-  // Más vendidos
-  bestsellersRow: {
-    gap: 12,
-    paddingBottom: 4,
-    marginBottom: 28,
+  // Grilla de destacados: 2 columnas
+  productGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
   },
   productCard: {
-    width: 148,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 12,
-    alignItems: 'center',
+    width: '47%',
     gap: 6,
-    shadowColor: '#3D1F8B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
   },
-  productIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 14,
+  productImageWrapper: {
+    position: 'relative',
+  },
+  productImage: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    backgroundColor: C.surfaceAlt,
+    ...cardShadow(C),
+  },
+  productTag: {
+    position: 'absolute',
+    left: 8,
+    top: 8,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  productTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  productAddBtn: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
-  },
-  productEmoji: {
-    fontSize: 32,
+    ...cardShadow(C),
   },
   productName: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#1A1A1A',
-    textAlign: 'center',
-    lineHeight: 18,
+    color: C.text,
+    lineHeight: 16,
   },
   productPrice: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
-    color: '#2ECC71',
+    color: C.primary,
   },
   productUnit: {
     fontSize: 11,
-    fontWeight: '400',
-    color: '#9B8EC4',
-  },
-  addBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#EDE7F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
+    fontWeight: '600',
+    color: C.textFaint,
   },
 
-  // Banner horarios
-  banner: {
-    backgroundColor: '#EDE7F6',
-    borderRadius: 16,
+  // Barra fija del carrito
+  cartBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+    backgroundColor: C.success,
+    borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 14,
-    borderWidth: 1,
-    borderColor: '#D4C9F5',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 15,
+    ...floatingShadow(C, C.success),
   },
-  bannerIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bannerText: {
-    flex: 1,
-    gap: 8,
-  },
-  bannerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#3D1F8B',
-  },
-  bannerSlots: {
+  cartBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  slot: {
+  cartBarCount: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 8,
+    minWidth: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  cartBarCountText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  cartBarLabel: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  cartBarRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
-  slotText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#3D1F8B',
-  },
-  slotDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: '#C4B5F0',
+  cartBarTotal: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
 });

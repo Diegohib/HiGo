@@ -1,26 +1,36 @@
-import { useMemo, useState } from 'react';
+import {
+  useMemo,
+  useState } from 'react';
 import {
   StyleSheet,
-  Text,
   View,
-  TextInput,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   Image,
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Text from '../components/Text';
+import TextInput from '../components/TextInput';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { CatalogStackParamList } from '../navigation/types';
-import { PRODUCTS, CATEGORIES, Product } from '../data/products';
+import { HomeStackParamList } from '../navigation/types';
+import { Product, Category } from '../data/products';
+import { useProductsStore, useDisplayCategories } from '../store/productsStore';
 import { useCartStore } from '../store/cartStore';
+import { useThemeColors } from '../theme/useThemeColors';
+import { ThemeColors } from '../theme/colors';
+import { cardShadow } from '../theme/elevation';
+import { getCategoryIcon } from '../theme/categoryIcons';
 
-type CatalogNav   = StackNavigationProp<CatalogStackParamList, 'Catalog'>;
-type CatalogRoute = RouteProp<CatalogStackParamList, 'Catalog'>;
+type CatalogNav   = StackNavigationProp<HomeStackParamList, 'Catalog'>;
+type CatalogRoute = RouteProp<HomeStackParamList, 'Catalog'>;
 
 export default function CatalogScreen() {
+  const C = useThemeColors();
+  const styles = makeStyles(C);
   const navigation = useNavigation<CatalogNav>();
   const route      = useRoute<CatalogRoute>();
 
@@ -28,26 +38,26 @@ export default function CatalogScreen() {
   const categoryName = route.params?.categoryName;
   const isFiltered   = Boolean(categoryId);
 
-  const [search, setSearch]         = useState('');
+  const [search, setSearch]         = useState(route.params?.initialSearch ?? '');
   const [activePill, setActivePill] = useState(0);
   const totalItems = useCartStore(s => s.totalItems);
+  const products   = useProductsStore(s => s.products);
+  const categories = useDisplayCategories();
 
   // ── Fuente de productos ──────────────────────────────────────────────────────
   const baseProducts = useMemo(
-    () => isFiltered ? PRODUCTS.filter(p => p.categoryId === categoryId) : PRODUCTS,
-    [isFiltered, categoryId],
+    () => isFiltered ? products.filter(p => p.categoryId === categoryId) : products,
+    [isFiltered, categoryId, products],
   );
 
-  // ── Pills ────────────────────────────────────────────────────────────────────
-  // Filtrado por categoría → subcategorías únicas
-  // Catálogo general     → nombres de categoría
+  // ── Pills de subcategoría ────────────────────────────────────────────────────
   const pills = useMemo(() => {
     if (isFiltered) {
       const unique = Array.from(new Set(baseProducts.map(p => p.subcategory)));
       return unique.length > 1 ? ['Todos', ...unique] : [];
     }
-    return ['Todos', ...CATEGORIES.map(c => c.name)];
-  }, [isFiltered, baseProducts]);
+    return ['Todos', ...categories.map(c => c.name)];
+  }, [isFiltered, baseProducts, categories]);
 
   // ── Lista filtrada ───────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -55,11 +65,9 @@ export default function CatalogScreen() {
 
     if (activePill > 0) {
       if (isFiltered) {
-        // modo categoría: filtrar por subcategoría
         list = list.filter(p => p.subcategory === pills[activePill]);
       } else {
-        // modo general: filtrar por nombre de categoría
-        const cat = CATEGORIES.find(c => c.name === pills[activePill]);
+        const cat = categories.find(c => c.name === pills[activePill]);
         if (cat) list = list.filter(p => p.categoryId === cat.id);
       }
     }
@@ -70,44 +78,55 @@ export default function CatalogScreen() {
     }
 
     return list;
-  }, [baseProducts, activePill, pills, isFiltered, search]);
+  }, [baseProducts, activePill, pills, isFiltered, search, categories]);
 
-  // ── Tarjeta ──────────────────────────────────────────────────────────────────
+  const sectionTitle = pills.length > 0 && activePill > 0
+    ? pills[activePill]
+    : (categoryName ?? 'Catálogo');
+
+  // ── Cambiar de categoría desde la tira de arriba ─────────────────────────────
+  function switchCategory(cat: Category) {
+    setActivePill(0);
+    setSearch('');
+    navigation.setParams({
+      categoryId: cat.id,
+      categoryName: cat.name,
+      categoryEmoji: cat.emoji,
+      categoryColor: cat.color,
+    });
+  }
+
+  // ── Tarjeta de producto ───────────────────────────────────────────────────────
 
   function renderProduct({ item }: { item: Product }) {
     const base = item.presentations[0];
     return (
       <TouchableOpacity
         style={styles.card}
-        activeOpacity={0.88}
+        activeOpacity={0.85}
         onPress={() => navigation.navigate('Product', { productId: item.id })}
       >
-        <Image
-          source={{ uri: item.image }}
-          style={styles.productImage}
-          resizeMode="cover"
-        />
-
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-          {!isFiltered && (
-            <Text style={styles.cardCategory}>
-              {CATEGORIES.find(c => c.id === item.categoryId)?.name}
-            </Text>
-          )}
-          <Text style={styles.cardPrice}>
-            ${base.price.toFixed(2)}
-            <Text style={styles.cardUnit}> / {base.label}</Text>
-          </Text>
+        <View style={styles.cardImageWrapper}>
+          <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="cover" />
+          <TouchableOpacity
+            style={styles.addBtn}
+            activeOpacity={0.75}
+            onPress={() => navigation.navigate('Product', { productId: item.id })}
+          >
+            <Ionicons name="add" size={20} color={C.primary} />
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.addBtn}
-          activeOpacity={0.75}
-          onPress={() => navigation.navigate('Product', { productId: item.id })}
-        >
-          <Ionicons name="add" size={22} color="#3D1F8B" />
-        </TouchableOpacity>
+        <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
+        {!isFiltered && (
+          <Text style={styles.cardCategory}>
+            {categories.find(c => c.id === item.categoryId)?.name}
+          </Text>
+        )}
+        <Text style={styles.cardPrice}>
+          ${base.price.toFixed(2)}
+          <Text style={styles.cardUnit}> / {base.label}</Text>
+        </Text>
       </TouchableOpacity>
     );
   }
@@ -116,32 +135,32 @@ export default function CatalogScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#3D1F8B" />
+      <StatusBar barStyle={C.statusBarStyle} />
 
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        {isFiltered ? (
-          <TouchableOpacity
-            style={styles.headerBtn}
-            activeOpacity={0.7}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.headerBtn} />
-        )}
+      {/* ── Buscar ── */}
+      <View style={styles.searchRow}>
+        <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color={C.text} />
+        </TouchableOpacity>
 
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {isFiltered ? categoryName : 'Catálogo'}
-        </Text>
+        <View style={styles.searchWrapper}>
+          <Ionicons name="search-outline" size={18} color={C.textFaint} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={isFiltered ? `Buscar en ${categoryName}...` : 'Buscar en el catálogo...'}
+            placeholderTextColor={C.textFaint}
+            value={search}
+            onChangeText={text => { setSearch(text); setActivePill(0); }}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} activeOpacity={0.7}>
+              <Ionicons name="close-circle" size={18} color={C.textFaint} />
+            </TouchableOpacity>
+          )}
+        </View>
 
-        <TouchableOpacity
-          style={styles.headerBtn}
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate('Carrito')}
-        >
-          <Ionicons name="cart-outline" size={24} color="#FFFFFF" />
+        <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7} onPress={() => navigation.navigate('Carrito')}>
+          <Ionicons name="cart-outline" size={22} color={C.text} />
           {totalItems > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{totalItems > 99 ? '99+' : totalItems}</Text>
@@ -150,80 +169,120 @@ export default function CatalogScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Contenido ── */}
-      <View style={styles.content}>
-
-        {/* Búsqueda */}
-        <View style={styles.searchWrapper}>
-          <Ionicons name="search-outline" size={18} color="#9B8EC4" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={isFiltered ? 'Buscar productos...' : 'Buscar en todo el catálogo...'}
-            placeholderTextColor="#9B8EC4"
-            value={search}
-            onChangeText={text => { setSearch(text); setActivePill(0); }}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} activeOpacity={0.7}>
-              <Ionicons name="close-circle" size={18} color="#9B8EC4" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Pills */}
-        {pills.length > 0 && (
-          <View style={styles.pillsRow}>
-            {pills.map((pill, i) => (
+      {/* ── Tira de categorías: solo al ver una categoría puntual, para saltar
+           a otra sin volver atrás. En "Todos" ya está la fila de tabs de abajo
+           con las mismas categorías — mostrar ambas era redundante. ── */}
+      {isFiltered && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryStrip}
+          contentContainerStyle={styles.categoryStripContent}
+        >
+          {categories.map((cat) => {
+            const active = cat.id === categoryId;
+            return (
               <TouchableOpacity
-                key={pill}
-                style={[styles.pill, activePill === i && styles.pillActive]}
-                onPress={() => setActivePill(i)}
+                key={cat.id}
+                style={styles.categoryStripItem}
                 activeOpacity={0.8}
+                onPress={() => switchCategory(cat)}
               >
-                <Text style={[styles.pillText, activePill === i && styles.pillTextActive]}>
-                  {pill}
+                <View style={[styles.categoryStripCircle, { backgroundColor: cat.color + '1E' }, active && styles.categoryStripCircleActive]}>
+                  <MaterialCommunityIcons name={getCategoryIcon(cat.id)} size={24} color={cat.color} />
+                </View>
+                <Text
+                  style={[styles.categoryStripLabel, active && styles.categoryStripLabelActive]}
+                  numberOfLines={2}
+                >
+                  {cat.name}
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        )}
+            );
+          })}
+        </ScrollView>
+      )}
 
-        {/* Lista */}
-        <FlatList
-          data={filtered}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
+      {/* ── Tabs de subcategoría ── */}
+      {pills.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabsRow}
+          contentContainerStyle={styles.tabsRowContent}
+        >
+          {pills.map((pill, i) => {
+            const active = activePill === i;
+            return (
+              <TouchableOpacity
+                key={pill}
+                style={styles.tabItem}
+                activeOpacity={0.7}
+                onPress={() => setActivePill(i)}
+              >
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>{pill}</Text>
+                {active && <View style={styles.tabUnderline} />}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      {/* ── Lista ── */}
+      <FlatList
+        data={filtered}
+        keyExtractor={item => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.row}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+            <Text style={styles.sectionCount}>{filtered.length} producto{filtered.length !== 1 ? 's' : ''}</Text>
+          </View>
+        }
+        ListEmptyComponent={
+          search.trim().length === 0 ? (
+            // No es que la búsqueda no encontró nada — todavía no hay
+            // productos cargados en esta categoría (o en el catálogo entero).
+            <View style={styles.empty}>
+              <Ionicons name="storefront-outline" size={44} color="#D4C9F5" />
+              <Text style={styles.emptyTitle}>Muy pronto</Text>
+              <Text style={styles.emptyText}>
+                Estamos subiendo los productos{isFiltered ? ` de ${categoryName}` : ''}. ¡Volvé pronto!
+              </Text>
+            </View>
+          ) : (
             <View style={styles.empty}>
               <Ionicons name="search-outline" size={44} color="#D4C9F5" />
               <Text style={styles.emptyTitle}>Sin resultados</Text>
               <Text style={styles.emptyText}>Intentá con otro término</Text>
             </View>
-          }
-          renderItem={renderProduct}
-        />
-      </View>
+          )
+        }
+        renderItem={renderProduct}
+      />
     </SafeAreaView>
   );
 }
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#3D1F8B',
+    backgroundColor: C.background,
   },
 
-  // Header
-  header: {
+  // Buscar
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#3D1F8B',
+    paddingTop: 10,
+    paddingBottom: 6,
   },
   headerBtn: {
     width: 40,
@@ -231,157 +290,196 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: 2,
+    right: 2,
     backgroundColor: '#E74C3C',
     borderRadius: 10,
-    minWidth: 18,
-    height: 18,
+    minWidth: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
-    borderWidth: 2,
-    borderColor: '#3D1F8B',
   },
   badgeText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '800',
   },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginHorizontal: 12,
-  },
-
-  // Área de contenido
-  content: {
-    flex: 1,
-    backgroundColor: '#F7F5FF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-
-  // Búsqueda
   searchWrapper: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0EEFF',
-    borderRadius: 12,
-    marginHorizontal: 18,
-    marginTop: 16,
-    marginBottom: 12,
+    backgroundColor: C.surface,
+    borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#E0D9F5',
+    borderColor: C.border,
+    ...cardShadow(C),
   },
   searchIcon: { marginRight: 8 },
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: '#1A1A1A',
+    color: C.text,
   },
 
-  // Pills
-  pillsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  // Tira de categorías
+  categoryStrip: {
+    flexGrow: 0,
+  },
+  categoryStripContent: {
     paddingHorizontal: 16,
-    paddingBottom: 4,
+    paddingVertical: 12,
+    gap: 16,
   },
-  pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#3D1F8B',
-  },
-  pillActive: {
-    backgroundColor: '#3D1F8B',
-    borderColor: '#3D1F8B',
-  },
-  pillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#3D1F8B',
-  },
-  pillTextActive: {
-    color: '#FFFFFF',
-  },
-
-  // Lista
-  list: {
-    paddingHorizontal: 18,
-    paddingTop: 4,
-    paddingBottom: 36,
-    gap: 12,
-  },
-
-  // Tarjeta
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    flexDirection: 'row',
+  categoryStripItem: {
     alignItems: 'center',
-    padding: 12,
-    gap: 14,
-    shadowColor: '#3D1F8B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    gap: 6,
+    width: 68,
   },
-  productImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: '#F0EEFF',
+  categoryStripCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cardInfo: {
-    flex: 1,
-    gap: 3,
+  categoryStripCircleActive: {
+    borderWidth: 2.5,
+    borderColor: C.primary,
   },
-  cardName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    lineHeight: 20,
-  },
-  cardCategory: {
+  categoryStripLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#9B8EC4',
+    color: C.textSoft,
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+  categoryStripLabelActive: {
+    color: C.text,
+    fontWeight: '800',
+  },
+
+  // Tabs de subcategoría
+  tabsRow: {
+    flexGrow: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  tabsRowContent: {
+    paddingHorizontal: 16,
+    gap: 22,
+  },
+  tabItem: {
+    alignItems: 'center',
+    paddingBottom: 10,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: C.textFaint,
+  },
+  tabTextActive: {
+    color: C.text,
+    fontWeight: '800',
+  },
+  tabUnderline: {
+    position: 'absolute',
+    bottom: -1,
+    height: 2.5,
+    width: '100%',
+    backgroundColor: C.primary,
+    borderRadius: 2,
+  },
+
+  // Encabezado de sección
+  sectionHeader: {
+    paddingTop: 18,
+    paddingBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: C.text,
+    letterSpacing: -0.3,
+  },
+  sectionCount: {
+    fontSize: 13,
+    color: C.textFaint,
+    marginTop: 2,
+  },
+
+  // Lista / grid
+  list: {
+    paddingHorizontal: 16,
+    paddingBottom: 36,
+  },
+  row: {
+    gap: 12,
+    marginBottom: 14,
+  },
+
+  // Tarjeta de producto
+  card: {
+    flex: 1,
+    backgroundColor: C.surface,
+    borderRadius: 18,
+    padding: 10,
+    gap: 6,
+    ...cardShadow(C),
+  },
+  cardImageWrapper: {
+    position: 'relative',
+  },
+  cardImage: {
+    width: '100%',
+    height: 110,
+    borderRadius: 14,
+    backgroundColor: C.primaryFaint,
+  },
+  addBtn: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.text,
+    lineHeight: 18,
+    minHeight: 36,
+  },
+  cardCategory: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.textFaint,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   cardPrice: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#2ECC71',
+    color: C.primary,
   },
   cardUnit: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '400',
-    color: '#9B8EC4',
-  },
-  addBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    backgroundColor: '#EDE7F6',
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: C.textFaint,
   },
 
   // Vacío
@@ -393,10 +491,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#9B8EC4',
+    color: C.textFaint,
   },
   emptyText: {
     fontSize: 13,
-    color: '#BEB3E0',
+    color: C.textFaint,
   },
 });

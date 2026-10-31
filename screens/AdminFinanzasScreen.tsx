@@ -1,12 +1,21 @@
-import { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
+  useState } from 'react';
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  StatusBar,
 } from 'react-native';
+import Text from '../components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
 import { useAdminFinanzasStore, WeekFinance } from '../store/adminFinanzasStore';
 import { formatShortDate, nextPayFriday } from '../utils/earnings';
+import { useThemeColors } from '../theme/useThemeColors';
+import { cardShadow } from '../theme/elevation';
+import { ThemeColors } from '../theme/colors';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'AdminFinanzas'>;
@@ -25,11 +34,13 @@ function FlowRow({
   amount: number;
   color: string;
 }) {
+  const C = useThemeColors();
+  const fc = makeFcStyles(C);
   const isNeg = amount < 0;
   return (
     <View style={fc.flowRow}>
       <View style={fc.flowLabelRow}>
-        <Ionicons name={icon} size={14} color="#555" />
+        <Ionicons name={icon} size={14} color={C.textSoft} />
         <Text style={fc.flowLabel}>{label}</Text>
       </View>
       <Text style={[fc.flowAmount, { color }]}>
@@ -40,6 +51,8 @@ function FlowRow({
 }
 
 function SummaryChip({ label, value, bg, color }: { label: string; value: string; bg: string; color: string }) {
+  const C = useThemeColors();
+  const fc = makeFcStyles(C);
   return (
     <View style={[fc.chip, { backgroundColor: bg }]}>
       <Text style={[fc.chipValue, { color }]}>{value}</Text>
@@ -53,19 +66,21 @@ function WeekHistoryCard({
 }: {
   week: WeekFinance; expanded: boolean; onToggle: () => void;
 }) {
+  const C = useThemeColors();
+  const fc = makeFcStyles(C);
   return (
     <View style={fc.histCard}>
       <TouchableOpacity style={fc.histHeader} onPress={onToggle} activeOpacity={0.8}>
         <View style={fc.histLeft}>
-          <View style={[fc.histBadge, week.status === 'pagado' ? fc.badgePaid : fc.badgePending]}>
-            <Text style={fc.histBadgeText}>{week.status === 'pagado' ? 'Pagado' : 'Pendiente'}</Text>
+          <View style={[fc.histBadge, week.status === 'cerrada' ? fc.badgePaid : fc.badgePending]}>
+            <Text style={fc.histBadgeText}>{week.status === 'cerrada' ? 'Cerrada' : 'Pendiente'}</Text>
           </View>
           <Text style={fc.histWeek}>{week.weekLabel}</Text>
-          <Text style={fc.histOrders}>{week.ordersCount} pedidos</Text>
+          <Text style={fc.histOrders}>{week.ordersCount} entregados</Text>
         </View>
         <View style={fc.histRight}>
           <Text style={fc.histIncome}>${week.totalIncome.toFixed(0)}</Text>
-          <Text style={[fc.histNet, { color: week.higoNet >= 0 ? '#1B5E20' : '#B71C1C' }]}>
+          <Text style={[fc.histNet, { color: week.higoNet >= 0 ? C.success : C.danger }]}>
             neto ${week.higoNet.toFixed(2)}
           </Text>
           <Text style={fc.histChevron}>{expanded ? '▲' : '▼'}</Text>
@@ -80,11 +95,11 @@ function WeekHistoryCard({
           <FlowRow icon="car-outline"       label="Transportistas"   amount={week.toTransportistas}  color="#5C3D08" />
           <View style={fc.histDivider} />
           <FlowRow icon="briefcase-outline" label="Margen 7%"        amount={week.higoGross}          color={ACCENT} />
-          <FlowRow icon="settings-outline"  label="Costos operativos" amount={-week.operationalCosts} color="#C62828" />
+          <FlowRow icon="bicycle-outline"   label="Pago a cocheros"  amount={-week.toCocheros}       color="#C62828" />
           <View style={[fc.histDivider, { marginTop: 6 }]} />
           <View style={fc.netRow}>
             <Text style={fc.netLabel}>Ganancia neta</Text>
-            <Text style={[fc.netAmount, { color: week.higoNet >= 0 ? '#1B5E20' : '#B71C1C' }]}>
+            <Text style={[fc.netAmount, { color: week.higoNet >= 0 ? C.success : C.danger }]}>
               ${week.higoNet.toFixed(2)}
             </Text>
           </View>
@@ -97,6 +112,8 @@ function WeekHistoryCard({
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 
 export default function AdminFinanzasScreen({ navigation }: Props) {
+  const C = useThemeColors();
+  const styles = makeStyles(C);
   const { weeks }  = useAdminFinanzasStore();
   const current    = weeks[0];
   const history    = weeks.slice(1);
@@ -107,7 +124,7 @@ export default function AdminFinanzasScreen({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={C.statusBarStyle} />
 
       {/* ── Header ── */}
       <View style={styles.header}>
@@ -131,17 +148,17 @@ export default function AdminFinanzasScreen({ navigation }: Props) {
           <SummaryChip
             label="Ingresos"
             value={`$${current.totalIncome.toFixed(0)}`}
-            bg="#E3F2FD" color="#0D47A1"
+            bg={C.primaryFaint} color={ACCENT}
           />
           <SummaryChip
             label="A pagar"
             value={`$${totalPayouts.toFixed(0)}`}
-            bg="#FFF3E0" color="#E65100"
+            bg={C.warningFaint} color="#E65100"
           />
           <SummaryChip
             label="Neto HiGo"
             value={`$${current.higoNet.toFixed(0)}`}
-            bg="#E8F5E9" color="#1B5E20"
+            bg={C.successFaint} color={C.success}
           />
         </View>
 
@@ -155,7 +172,10 @@ export default function AdminFinanzasScreen({ navigation }: Props) {
 
         <View style={styles.currentCard}>
           <Text style={styles.currentWeekLabel}>{current.weekLabel}</Text>
-          <Text style={styles.currentOrders}>{current.ordersCount} pedidos procesados</Text>
+          <Text style={styles.currentOrders}>
+            {current.ordersCount} pedidos entregados
+            {current.inProgressCount > 0 ? ` · ${current.inProgressCount} en curso (todavía no cuentan)` : ''}
+          </Text>
 
           <View style={styles.incomeRow}>
             <Text style={styles.incomeLabel}>Ingresos totales</Text>
@@ -171,7 +191,7 @@ export default function AdminFinanzasScreen({ navigation }: Props) {
           <View style={styles.divider} />
           <Text style={styles.subHeader}>Resultado HiGo</Text>
           <FlowRow icon="briefcase-outline" label="Margen gestión (7%)" amount={current.higoGross}          color={ACCENT} />
-          <FlowRow icon="settings-outline"  label="Costos operativos"   amount={-current.operationalCosts}  color="#C62828" />
+          <FlowRow icon="bicycle-outline"   label="Pago a cocheros"     amount={-current.toCocheros}        color="#C62828" />
 
           <View style={[styles.divider, { marginTop: 8 }]} />
           <View style={styles.netRow}>
@@ -200,13 +220,13 @@ export default function AdminFinanzasScreen({ navigation }: Props) {
 
 // ─── Estilos sub-componentes ──────────────────────────────────────────────────
 
-const fc = StyleSheet.create({
+const makeFcStyles = (C: ThemeColors) => StyleSheet.create({
   flowRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', paddingVertical: 5,
   },
   flowLabelRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, flex: 1 },
-  flowLabel:  { fontSize: 14, color: '#333' },
+  flowLabel:  { fontSize: 14, color: C.text },
   flowAmount: { fontSize: 14, fontWeight: '700' },
   chip: {
     flex: 1, marginHorizontal: 4, borderRadius: 12,
@@ -215,9 +235,9 @@ const fc = StyleSheet.create({
   chipValue: { fontSize: 18, fontWeight: '800' },
   chipLabel: { fontSize: 11, marginTop: 2, opacity: 0.8 },
   histCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, marginBottom: 10,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6,
-    elevation: 2, overflow: 'hidden',
+    backgroundColor: C.surface, borderRadius: 16, marginBottom: 10,
+    ...cardShadow(C),
+    overflow: 'hidden',
   },
   histHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
@@ -226,28 +246,28 @@ const fc = StyleSheet.create({
   histLeft:  { flex: 1 },
   histRight: { alignItems: 'flex-end' },
   histBadge: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 4 },
-  badgePaid:    { backgroundColor: '#D4EDDA' },
-  badgePending: { backgroundColor: '#FFF3CD' },
+  badgePaid:    { backgroundColor: C.successFaint },
+  badgePending: { backgroundColor: C.warningFaint },
   histBadgeText:{ fontSize: 11, fontWeight: '700' },
-  histWeek:     { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
-  histOrders:   { fontSize: 12, color: '#666', marginTop: 2 },
-  histIncome:   { fontSize: 16, fontWeight: '800', color: '#0D47A1' },
+  histWeek:     { fontSize: 14, fontWeight: '700', color: C.text },
+  histOrders:   { fontSize: 12, color: C.textSoft, marginTop: 2 },
+  histIncome:   { fontSize: 16, fontWeight: '800', color: ACCENT },
   histNet:      { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  histChevron:  { fontSize: 11, color: '#999', marginTop: 4 },
+  histChevron:  { fontSize: 11, color: C.textFaint, marginTop: 4 },
   histDetail:   { paddingHorizontal: 14, paddingBottom: 14 },
-  histDivider:  { height: 1, backgroundColor: '#E8E8E8', marginVertical: 8 },
+  histDivider:  { height: 1, backgroundColor: C.border, marginVertical: 8 },
   netRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginTop: 4,
   },
-  netLabel:  { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
-  netAmount: { fontSize: 18, fontWeight: '800', color: '#1B5E20' },
+  netLabel:  { fontSize: 15, fontWeight: '700', color: C.text },
+  netAmount: { fontSize: 18, fontWeight: '800', color: C.success },
 });
 
 // ─── Estilos pantalla ─────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  root:  { flex: 1, backgroundColor: '#F0F4F8' },
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
+  root:  { flex: 1, backgroundColor: C.background },
   header: {
     backgroundColor: HEADER,
     paddingTop: 52, paddingBottom: 18,
@@ -271,32 +291,32 @@ const styles = StyleSheet.create({
   chipsRow: { flexDirection: 'row', marginBottom: 20 },
 
   sectionRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  sectionTitle:{ fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
+  sectionTitle:{ fontSize: 16, fontWeight: '800', color: C.text },
   pendingPill: {
-    marginLeft: 10, backgroundColor: '#FFF3CD',
+    marginLeft: 10, backgroundColor: C.warningFaint,
     borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
   },
   pendingPillText: { fontSize: 12, fontWeight: '700', color: '#8B5E00' },
 
   currentCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 20,
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+    backgroundColor: C.surface, borderRadius: 18, padding: 18, marginBottom: 20,
+    ...cardShadow(C),
   },
-  currentWeekLabel: { fontSize: 15, fontWeight: '700', color: '#1A1A1A', marginBottom: 2 },
-  currentOrders:    { fontSize: 12, color: '#888', marginBottom: 14 },
+  currentWeekLabel: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 2 },
+  currentOrders:    { fontSize: 12, color: C.textSoft, marginBottom: 14 },
 
   incomeRow: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', backgroundColor: '#E3F2FD',
+    alignItems: 'center', backgroundColor: C.primaryFaint,
     borderRadius: 10, padding: 12,
   },
-  incomeLabel:  { fontSize: 14, fontWeight: '700', color: '#0D47A1' },
-  incomeAmount: { fontSize: 20, fontWeight: '900', color: '#0D47A1' },
+  incomeLabel:  { fontSize: 14, fontWeight: '700', color: ACCENT },
+  incomeAmount: { fontSize: 20, fontWeight: '900', color: ACCENT },
 
-  divider:   { height: 1, backgroundColor: '#EFEFEF', marginVertical: 12 },
-  subHeader: { fontSize: 12, fontWeight: '700', color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  divider:   { height: 1, backgroundColor: C.border, marginVertical: 12 },
+  subHeader: { fontSize: 12, fontWeight: '700', color: C.textSoft, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   netRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  netLabel:  { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
-  netAmount: { fontSize: 22, fontWeight: '900', color: '#1B5E20' },
+  netLabel:  { fontSize: 15, fontWeight: '700', color: C.text },
+  netAmount: { fontSize: 22, fontWeight: '900', color: C.success },
 });

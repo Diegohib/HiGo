@@ -1,7 +1,10 @@
 // ─── Origen: Mercado Mayorista de Quito ──────────────────────────────────────
+// Av. Teniente Hugo Ortiz y Juan Núñez, sector Turubamba/Solanda (sur de
+// Quito) — coordenadas reales verificadas en OpenStreetMap. La ubicación
+// anterior estaba mal puesta (quedaba por el centro-norte de la ciudad).
 
-export const WAREHOUSE_LAT = -0.2105;
-export const WAREHOUSE_LNG = -78.4900;
+export const WAREHOUSE_LAT = -0.2712;
+export const WAREHOUSE_LNG = -78.5347;
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -20,7 +23,7 @@ export interface TransportInfo {
 //   30–150 lbs → taxi:     base $2.00 + $0.50/km
 //   > 150 lbs  → camioneta: base $3.00 + $0.70/km
 
-const VEHICLES: Array<{
+export const VEHICLES: Array<{
   maxLbs:  number;
   type:    VehicleType;
   label:   string;

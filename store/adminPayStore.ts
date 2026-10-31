@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatShortDate, nextPayFriday } from '../utils/earnings';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -65,40 +67,48 @@ interface AdminPayState {
   markAsPaid:     (operatorId: string) => void;
 }
 
-let historyCounter = INITIAL_HISTORY.length + 1;
+export const useAdminPayStore = create<AdminPayState>()(
+  persist(
+    (set, get) => ({
+      operators:      INITIAL_OPERATORS,
+      paymentHistory: INITIAL_HISTORY,
 
-export const useAdminPayStore = create<AdminPayState>((set, get) => ({
-  operators:      INITIAL_OPERATORS,
-  paymentHistory: INITIAL_HISTORY,
+      markAsPaid: (operatorId: string) => {
+        const operator = get().operators.find(o => o.id === operatorId);
+        if (!operator || operator.isPaid || operator.weekEarnings === 0) return;
 
-  markAsPaid: (operatorId: string) => {
-    const operator = get().operators.find(o => o.id === operatorId);
-    if (!operator || operator.isPaid || operator.weekEarnings === 0) return;
+        const friday    = nextPayFriday();
+        const weekLabel = buildCurrentWeekLabel();
 
-    const friday    = nextPayFriday();
-    const weekLabel = buildCurrentWeekLabel();
+        const record: PaymentRecord = {
+          id:           `h_${Date.now()}`,
+          operatorId:   operator.id,
+          operatorName: operator.name,
+          role:         operator.role,
+          amount:       operator.weekEarnings,
+          paidAt:       friday,
+          weekLabel,
+        };
 
-    const record: PaymentRecord = {
-      id:           `h${historyCounter++}`,
-      operatorId:   operator.id,
-      operatorName: operator.name,
-      role:         operator.role,
-      amount:       operator.weekEarnings,
-      paidAt:       friday,
-      weekLabel,
-    };
-
-    set(state => ({
-      operators: state.operators.map(o =>
-        o.id === operatorId
-          ? { ...o, isPaid: true, paidAmount: o.weekEarnings, weekEarnings: 0 }
-          : o,
-      ),
-      // El pago más reciente va al inicio del historial
-      paymentHistory: [record, ...state.paymentHistory],
-    }));
-  },
-}));
+        set(state => ({
+          operators: state.operators.map(o =>
+            o.id === operatorId
+              ? { ...o, isPaid: true, paidAmount: o.weekEarnings, weekEarnings: 0 }
+              : o,
+          ),
+          // El pago más reciente va al inicio del historial
+          paymentHistory: [record, ...state.paymentHistory],
+        }));
+      },
+    }),
+    {
+      name: 'higo-admin-pay',
+      storage: createJSONStorage(() => AsyncStorage, {
+        reviver: (key, value) => (key === 'paidAt' && typeof value === 'string' ? new Date(value) : value),
+      }),
+    }
+  )
+);
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 

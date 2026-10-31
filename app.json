@@ -4,16 +4,12 @@
     "slug": "HiGo",
     "version": "1.0.0",
     "orientation": "portrait",
+    "scheme": "higo",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.higo.app"
     },
     "plugins": [
       [
@@ -21,20 +17,42 @@
         {
           "locationWhenInUsePermission": "HiGo necesita acceso a tu ubicación para sugerir tu dirección de entrega."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "HiGo necesita acceso a tus fotos para subir tus documentos de verificación.",
+          "cameraPermission": "HiGo necesita acceso a tu cámara para tomar la foto de tus documentos de verificación."
+        }
+      ],
+      "expo-font",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
       ]
     ],
     "android": {
+      "package": "com.higo.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#3D1F8B"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "config": {
         "googleMaps": {
           "apiKey": "TU_GOOGLE_MAPS_API_KEY"
         }
-      }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

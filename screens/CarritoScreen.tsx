@@ -1,6 +1,5 @@
 import {
   StyleSheet,
-  Text,
   View,
   FlatList,
   Image,
@@ -8,12 +7,17 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
+import Text from '../components/Text';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { HomeStackParamList } from '../navigation/types';
 import { useCartStore, CartItem } from '../store/cartStore';
-import { PRODUCTS } from '../data/products';
+import { useProductsStore } from '../store/productsStore';
+import { useThemeColors } from '../theme/useThemeColors';
+import { ThemeColors } from '../theme/colors';
+import { cardShadow, floatingShadow } from '../theme/elevation';
 
 const MANAGEMENT_FEE = 0.07;
 const MINIMUM_ORDER  = 15;
@@ -21,8 +25,11 @@ const MINIMUM_ORDER  = 15;
 type CarritoNav = StackNavigationProp<HomeStackParamList, 'Carrito'>;
 
 export default function CarritoScreen() {
+  const C = useThemeColors();
+  const styles = makeStyles(C);
   const navigation    = useNavigation<CarritoNav>();
   const { items, updateQuantity, removeItem } = useCartStore();
+  const products = useProductsStore(s => s.products);
 
   const subtotal    = items.reduce((s, i) => s + i.presentationPrice * i.quantity, 0);
   const gestion     = subtotal * MANAGEMENT_FEE;
@@ -36,7 +43,7 @@ export default function CarritoScreen() {
   // ── Fila de producto ────────────────────────────────────────────────────────
 
   function renderItem({ item }: { item: CartItem }) {
-    const product = PRODUCTS.find(p => p.id === item.productId);
+    const product = products.find(p => p.id === item.productId);
     if (!product) return null;
 
     return (
@@ -72,7 +79,7 @@ export default function CarritoScreen() {
               activeOpacity={0.7}
               onPress={() => updateQuantity(item.productId, item.presentationIndex, -1)}
             >
-              <Ionicons name="remove" size={16} color="#3D1F8B" />
+              <Ionicons name="remove" size={16} color={C.primary} />
             </TouchableOpacity>
             <Text style={styles.qtyValue}>{item.quantity}</Text>
             <TouchableOpacity
@@ -80,7 +87,7 @@ export default function CarritoScreen() {
               activeOpacity={0.7}
               onPress={() => updateQuantity(item.productId, item.presentationIndex, 1)}
             >
-              <Ionicons name="add" size={16} color="#3D1F8B" />
+              <Ionicons name="add" size={16} color={C.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -111,10 +118,10 @@ export default function CarritoScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#3D1F8B" />
+      <StatusBar barStyle={C.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={styles.header}>
+      <LinearGradient colors={C.headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <TouchableOpacity
           style={styles.headerBtn}
           activeOpacity={0.7}
@@ -124,7 +131,7 @@ export default function CarritoScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mi carrito</Text>
         <View style={styles.headerBtn} />
-      </View>
+      </LinearGradient>
 
       {/* ── Lista ── */}
       <FlatList
@@ -196,10 +203,10 @@ export default function CarritoScreen() {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#3D1F8B',
+    backgroundColor: C.headerGradient[0],
   },
 
   // Header
@@ -209,7 +216,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#3D1F8B',
   },
   headerBtn: {
     width: 40,
@@ -223,11 +229,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#FFFFFF',
+    letterSpacing: -0.3,
   },
 
   // Lista
   list: {
-    backgroundColor: '#F7F5FF',
+    backgroundColor: C.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 18,
@@ -242,23 +249,19 @@ const styles = StyleSheet.create({
 
   // Fila de producto
   row: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: C.surface,
+    borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     gap: 12,
-    shadowColor: '#3D1F8B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 3,
+    ...cardShadow(C),
   },
   rowImage: {
     width: 72,
     height: 72,
     borderRadius: 12,
-    backgroundColor: '#F0EEFF',
+    backgroundColor: C.primaryFaint,
   },
   rowInfo: {
     flex: 1,
@@ -267,18 +270,18 @@ const styles = StyleSheet.create({
   rowName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.text,
     lineHeight: 19,
   },
   rowPresentation: {
     fontSize: 12,
-    color: '#9B8EC4',
+    color: C.textFaint,
     fontWeight: '500',
   },
   rowPrice: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#2ECC71',
+    color: C.primary,
   },
   rowActions: {
     alignItems: 'center',
@@ -288,7 +291,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#FEF0EE',
+    backgroundColor: C.dangerFaint,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -296,7 +299,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#EDE7F6',
+    backgroundColor: C.primaryFaint,
     borderRadius: 10,
     paddingHorizontal: 4,
     paddingVertical: 4,
@@ -305,14 +308,14 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 7,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   qtyValue: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#3D1F8B',
+    color: C.primary,
     minWidth: 20,
     textAlign: 'center',
   },
@@ -320,21 +323,18 @@ const styles = StyleSheet.create({
   // Resumen
   summary: {
     marginTop: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surface,
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#3D1F8B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
+    ...cardShadow(C),
     gap: 12,
   },
   summaryTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#1A1A1A',
+    color: C.text,
     marginBottom: 4,
+    letterSpacing: -0.3,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -343,35 +343,35 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 14,
-    color: '#555',
+    color: C.textSoft,
     flex: 1,
   },
   summaryValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.text,
   },
   summaryTransport: {
     fontSize: 12,
-    color: '#9B8EC4',
+    color: C.textFaint,
     fontStyle: 'italic',
     textAlign: 'right',
     flex: 1,
   },
   divider: {
     height: 1,
-    backgroundColor: '#E0D9F5',
+    backgroundColor: C.border,
     marginVertical: 4,
   },
   totalLabel: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.text,
   },
   totalValue: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#3D1F8B',
+    color: C.primary,
   },
 
   // Advertencia pedido mínimo
@@ -379,33 +379,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: '#FEF0EE',
+    backgroundColor: C.dangerFaint,
     borderRadius: 12,
     padding: 12,
   },
   minWarningText: {
     flex: 1,
     fontSize: 13,
-    color: '#E74C3C',
+    color: C.danger,
     lineHeight: 19,
     fontWeight: '600',
   },
 
   // Botón pagar
   payBtn: {
-    backgroundColor: '#2ECC71',
+    backgroundColor: C.success,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
     paddingVertical: 18,
-    borderRadius: 16,
+    borderRadius: 18,
     marginTop: 4,
-    shadowColor: '#2ECC71',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...floatingShadow(C, C.success),
   },
   payBtnDisabled: {
     backgroundColor: '#BEB3E0',
@@ -429,15 +425,15 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#9B8EC4',
+    color: C.textFaint,
   },
   emptyText: {
     fontSize: 14,
-    color: '#BEB3E0',
+    color: C.textFaint,
   },
   emptyBtn: {
     marginTop: 8,
-    backgroundColor: '#3D1F8B',
+    backgroundColor: C.primary,
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 14,

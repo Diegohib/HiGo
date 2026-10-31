@@ -1,0 +1,232 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Rol/estado de quien hace el pedido — usado para dejar que un cochero (u
+    // otro operativo, a futuro) vea/actualice solo los pedidos de su propio rol.
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function myStatus() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status;
+    }
+    function isApprovedOperator(role) {
+      return isSignedIn() && myRole() == role && myStatus() == 'approved';
+    }
+
+    // Perfil de cada usuario (cliente, cochero, transportista, comerciante, admin).
+    // Cualquiera crea su propio doc al registrarse. Un usuario puede actualizar
+    // sus propios datos pero NO su rol ni su status (eso solo lo cambia un admin
+    // al aprobar/rechazar una solicitud) — evita que alguien se auto-apruebe.
+    match /users/{uid} {
+      allow read:   if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isAdmin() || (
+        isSignedIn() && request.auth.uid == uid &&
+        request.resource.data.role   == resource.data.role &&
+        request.resource.data.status == resource.data.status
+      );
+    }
+
+    // Solicitudes de registro de personal (cochero/transportista/comerciante).
+    // El solicitante crea y lee la suya; solo un admin puede aprobar/rechazar.
+    match /solicitudes/{id} {
+      allow read:   if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAdmin();
+    }
+
+    // Pedidos de clientes. El cliente crea y lee los suyos, pero no los puede
+    // modificar después (ni el estado ni el total). Un admin lee y actualiza
+    // todos. Además:
+    //  - un cochero aprobado ve los pedidos de ruta 'cochero' (programada);
+    //    reclama uno libre en 'recibido' (operatorUid pasa de '' a su uid) y
+    //    después sigue el suyo.
+    //  - un transportista aprobado ve todos los pedidos; toma uno libre solo
+    //    cuando el cochero ya lo consolidó (o, en pedidos viejos de entrega
+    //    directa sin cochero, en 'recibido') y después sigue el suyo.
+    // Cada operativo solo toca sus propios campos + el estado, y nadie puede
+    // robarle un pedido ya reclamado por otro.
+    match /orders/{id} {
+      allow read: if isSignedIn() && (
+        resource.data.uid == request.auth.uid ||
+        isAdmin() ||
+        isApprovedOperator(resource.data.operatorRole) ||
+        isApprovedOperator('transportista')
+      );
+      // Pago al crear: transferencia queda retenida (released false) hasta que
+      // el admin confirme el comprobante; efectivo sale enseguida, con tope de
+      // $100 (CASH_LIMIT en la app).
+      allow create: if isSignedIn() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.status == 'recibido' &&
+        request.resource.data.operatorUid == '' &&
+        request.resource.data.transportistaUid == '' &&
+        (
+          (
+            request.resource.data.paymentMethod == 'transferencia' &&
+            request.resource.data.paymentStatus == 'por_verificar' &&
+            request.resource.data.released == false
+          ) ||
+          (
+            request.resource.data.paymentMethod == 'efectivo' &&
+            request.resource.data.paymentStatus == 'contra_entrega' &&
+            request.resource.data.released == true &&
+            request.resource.data.total <= 100
+          )
+        );
+      allow update: if isAdmin() ||
+        (
+          isApprovedOperator('cochero') &&
+          resource.data.operatorRole == 'cochero' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['operatorUid', 'operatorName', 'operatorPhone', 'status']) &&
+          (
+            resource.data.operatorUid == request.auth.uid ||
+            (
+              resource.data.operatorUid == '' &&
+              resource.data.status == 'recibido' &&
+              resource.data.get('released', true) == true &&
+              request.resource.data.operatorUid == request.auth.uid
+            )
+          )
+        ) ||
+        (
+          isApprovedOperator('transportista') &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['transportistaUid', 'transportistaName', 'transportistaPhone', 'status', 'paymentStatus']) &&
+          // Solo puede tocar el pago para marcar cobrado un efectivo.
+          (
+            !('paymentStatus' in request.resource.data.diff(resource.data).affectedKeys()) ||
+            (resource.data.paymentMethod == 'efectivo' && request.resource.data.paymentStatus == 'cobrado')
+          ) &&
+          (
+            resource.data.transportistaUid == request.auth.uid ||
+            (
+              resource.data.transportistaUid == '' &&
+              request.resource.data.transportistaUid == request.auth.uid &&
+              (
+                (resource.data.operatorRole == 'cochero' && resource.data.status == 'consolidado') ||
+                (resource.data.operatorRole == 'transportista' && resource.data.status == 'recibido')
+              )
+            )
+          )
+        );
+    }
+
+    // Tickets por puesto: un pedido se parte en un ticket por cada puesto del
+    // mercado que vende sus productos (ver store/stallTicketsStore.ts).
+    //  - el cliente los crea junto con su pedido (mismo batch) y lee los suyos.
+    //  - el comerciante lee los de su puesto y solo puede pasarlos de
+    //    'pendiente' a 'listo'.
+    //  - el cochero que reclamó el pedido se anota en ellos y los marca
+    //    'retirado' (el cochero trabaja en el mercado: junta todo y se lo pasa
+    //    al transportista).
+    // getAfter: al reclamar, el pedido y sus tickets se escriben en el mismo
+    // batch, así que se mira el pedido como queda después del batch.
+    function isPickerOf(orderId) {
+      let o = getAfter(/databases/$(database)/documents/orders/$(orderId)).data;
+      return isSignedIn() && o.operatorRole == 'cochero' && o.operatorUid == request.auth.uid;
+    }
+    match /stallTickets/{id} {
+      allow read: if isSignedIn() && (
+        resource.data.clientUid == request.auth.uid ||
+        resource.data.comercianteUid == request.auth.uid ||
+        isAdmin() ||
+        isApprovedOperator('cochero') ||
+        isApprovedOperator('transportista')
+      );
+      allow create: if isSignedIn() &&
+        request.resource.data.clientUid == request.auth.uid &&
+        request.resource.data.status == 'pendiente' &&
+        getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.uid == request.auth.uid &&
+        request.resource.data.released ==
+          getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.released;
+      allow update: if isAdmin() ||
+        (
+          isApprovedOperator('comerciante') &&
+          resource.data.comercianteUid == request.auth.uid &&
+          resource.data.status == 'pendiente' &&
+          request.resource.data.status == 'listo' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'listoAt'])
+        ) ||
+        (
+          isPickerOf(resource.data.orderId) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'retiradoAt', 'pickerUid', 'pickerName', 'pickerRole']) &&
+          request.resource.data.status in ['pendiente', 'listo', 'retirado']
+        );
+    }
+
+    // Chat de soporte: una conversación por cliente (no por pedido), para
+    // cualquier consulta. Solo el dueño del chat y un admin pueden verlo o
+    // escribirle; cada mensaje queda firmado por quien lo mandó.
+    match /supportChats/{uid} {
+      allow read:                if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+
+      match /messages/{messageId} {
+        allow read:   if isSignedIn() && (request.auth.uid == uid || isAdmin());
+        allow create: if isSignedIn() && (request.auth.uid == uid || isAdmin()) &&
+          request.resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    // Chat por pedido: entre el cliente y el operativo (cochero, por ahora) que
+    // reclamó SU pedido. Se valida contra el pedido real (orders/{id}), no
+    // contra campos sueltos del propio chat que cualquiera podría inventar.
+    function orderParty(orderId) {
+      let o = get(/databases/$(database)/documents/orders/$(orderId)).data;
+      return isSignedIn() && (
+        o.uid == request.auth.uid ||
+        o.operatorUid == request.auth.uid ||
+        o.transportistaUid == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    match /orderChats/{orderId} {
+      allow read, create, update: if orderParty(orderId);
+
+      match /messages/{messageId} {
+        allow read:   if orderParty(orderId);
+        allow create: if orderParty(orderId) && request.resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    // Catálogo (productos y categorías). Lectura pública — incluye clientes
+    // que navegan como invitados sin haber iniciado sesión. Solo un admin
+    // puede crear/editar/borrar.
+    match /products/{id} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+    match /categories/{id} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    // Configuración que carga el admin desde el panel web. "payment" tiene los
+    // datos de la cuenta bancaria de HiGo que el cliente ve para transferir.
+    match /config/{id} {
+      allow read:  if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Preguntas frecuentes del asistente virtual. Lectura pública (igual que
+    // el catálogo); solo un admin las carga/edita desde el panel web.
+    match /faqs/{id} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+  }
+}

@@ -1,3 +1,8 @@
+// Catálogo de arranque ("seed"). El catálogo real que usa la app vive en
+// Firestore (colecciones "products"/"categories", ver store/productsStore.ts)
+// — este archivo solo se usa una vez, para poblar Firestore la primera vez
+// desde la pantalla de administración. Después de eso, ya no se vuelve a leer.
+
 export type Presentation = {
   label:     string;
   price:     number;
@@ -14,6 +19,12 @@ export type Product = {
   image: string;
   description: string;
   presentations: Presentation[];
+  // Puesto del Mercado Mayorista que vende este producto (lo asigna el admin
+  // desde el panel web). Nombre y número se copian acá para no tener que leer
+  // el perfil del comerciante — los perfiles de usuario no son públicos.
+  comercianteUid?:  string;
+  comercianteName?: string;
+  stallNumber?:     string;
 };
 
 export type Category = {
@@ -21,21 +32,27 @@ export type Category = {
   name: string;
   emoji: string;
   color: string;
+  image: string; // foto real representativa (papa, uvas, tomate, arroz) — no hay
+                  // ícono de librería que represente bien cada una, así que se
+                  // usa foto en vez de ícono en toda la UI de categorías.
 };
-
-// ─── Categorías ───────────────────────────────────────────────────────────────
-
-export const CATEGORIES: Category[] = [
-  { id: 'tuberculos', name: 'Tubérculos', emoji: '🥔', color: '#8B6914' },
-  { id: 'frutas',     name: 'Frutas',     emoji: '🍎', color: '#2D7A3A' },
-  { id: 'verduras',   name: 'Verduras',   emoji: '🥦', color: '#388E3C' },
-  { id: 'abarrotes',  name: 'Abarrotes',  emoji: '📦', color: '#3D1F8B' },
-];
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
 const img = (id: string) =>
   `https://images.unsplash.com/photo-${id}?w=300&h=300&fit=crop&auto=format&q=80`;
+
+// ─── Categorías ───────────────────────────────────────────────────────────────
+// Cada foto se descargó y se revisó a mano antes de usarla — algunas URLs
+// "obvias" (mismo ID que ciertos productos) resultaron rotas o mostraban
+// otra cosa (ver bug de Arroz Extra más abajo).
+
+export const CATEGORIES: Category[] = [
+  { id: 'tuberculos', name: 'Tubérculos', emoji: '🥔', color: '#8B6914', image: img('1518977676601-b53f82aba655') }, // papa
+  { id: 'frutas',     name: 'Frutas',     emoji: '🍇', color: '#2D7A3A', image: img('1596363505729-4190a9506133') }, // uvas
+  { id: 'verduras',   name: 'Verduras',   emoji: '🍅', color: '#388E3C', image: img('1592841200221-a6898f307baa') }, // tomate
+  { id: 'abarrotes',  name: 'Abarrotes',  emoji: '🍚', color: '#3D1F8B', image: img('1586201375761-83865001e31c') }, // arroz
+];
 
 // ─── Productos ────────────────────────────────────────────────────────────────
 
@@ -64,7 +81,7 @@ export const PRODUCTS: Product[] = [
     subcategory: 'Tubérculos',
     emoji: '🥔',
     emojiColor: '#B8860B',
-    image: img('1512621816951-d210bec9163c'),
+    image: img('1590165482129-1b8b27698780'),
     description: 'Papa nabo fresca de la sierra ecuatoriana. Sabor suave, perfecta para purés y sopas.',
     presentations: [
       { label: 'Libra',   price:  0.40, weightLbs:   1 },
@@ -79,7 +96,7 @@ export const PRODUCTS: Product[] = [
     subcategory: 'Tubérculos',
     emoji: '🌿',
     emojiColor: '#6B8E23',
-    image: img('1499026893-b3f1ebec1eed'),
+    image: img('1757283961570-682154747d9c'),
     description: 'Yuca blanca fresca del oriente ecuatoriano. Base de sopas, seco de pollo y chicha.',
     presentations: [
       { label: 'Libra',   price:  0.60, weightLbs:   1 },
@@ -154,7 +171,7 @@ export const PRODUCTS: Product[] = [
     subcategory: 'Frutas',
     emoji: '🍅',
     emojiColor: '#C0392B',
-    image: img('1546470427-e26264be0b07'),
+    image: img('1693400228340-81693eeacf13'),
     description: 'Tomate de árbol rojo de la sierra. Ideal para jugos naturales, ají y ensaladas de frutas.',
     presentations: [
       { label: 'Dólar', price:  1.20, weightLbs:  2 },
@@ -182,7 +199,7 @@ export const PRODUCTS: Product[] = [
     subcategory: 'Frutas',
     emoji: '🫐',
     emojiColor: '#5D3A8E',
-    image: img('1596591868231-05e808f753e2'),
+    image: img('1562845029-d1b530d4cfd3'),
     description: 'Mora de castilla fresca de Tungurahua. Acidulce, perfecta para jugos, batidos y mermeladas.',
     presentations: [
       { label: 'Dólar', price:  1.00, weightLbs:  1.5 },
@@ -198,7 +215,7 @@ export const PRODUCTS: Product[] = [
     subcategory: 'Verduras',
     emoji: '🍅',
     emojiColor: '#C0392B',
-    image: img('1558818371-f3316e783f52'),
+    image: img('1592841200221-a6898f307baa'),
     description: 'Tomate riñón fresco de primera, cultivado en Ambato. Base de salsas, ensaladas y guisos.',
     presentations: [
       { label: 'Libra',   price:  0.80, weightLbs:   1 },
@@ -213,7 +230,7 @@ export const PRODUCTS: Product[] = [
     subcategory: 'Verduras',
     emoji: '🧅',
     emojiColor: '#8B3A8B',
-    image: img('1618512496248-a07e9dd6f252'),
+    image: img('1508747703725-719777637510'),
     description: 'Cebolla paiteña morada de Pimampiro, intensa y aromática. Esencial en curtidos y salsas.',
     presentations: [
       { label: 'Libra',   price:  0.60, weightLbs:   1 },
@@ -273,7 +290,7 @@ export const PRODUCTS: Product[] = [
     subcategory: 'Arroz',
     emoji: '🍚',
     emojiColor: '#C4943A',
-    image: img('1536304929831-ee1ca9d44906'),
+    image: img('1586201375761-83865001e31c'),
     description: 'Arroz blanco extra de grano largo de la Costa ecuatoriana. Rendidor y sin impurezas.',
     presentations: [
       { label: 'Libra',   price:  0.45, weightLbs:   1 },
@@ -288,7 +305,7 @@ export const PRODUCTS: Product[] = [
     subcategory: 'Azúcar',
     emoji: '🍬',
     emojiColor: '#F5CBA7',
-    image: img('1558618666-fcd25c85cd64'),
+    image: img('1673791031202-ebc0eea03bf2'),
     description: 'Azúcar blanca refinada de caña ecuatoriana. Uso doméstico e industrial, sin grumos.',
     presentations: [
       { label: 'Libra',   price:  0.44, weightLbs:   1 },

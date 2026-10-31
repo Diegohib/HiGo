@@ -1,17 +1,15 @@
-import { useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  Pressable,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, TextInput as RNTextInput } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore, MIN_PASSWORD_LENGTH } from '../store/authStore';
+import {
+  AuthScreen,
+  AuthField,
+  AuthPrimaryButton,
+  AuthDivider,
+  AuthSecondaryButton,
+} from '../components/AuthLayout';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'Register'>;
@@ -25,10 +23,21 @@ export default function RegisterScreen({ navigation }: Props) {
   const [phone,           setPhone]           = useState('');
   const [password,        setPassword]        = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [submitting,      setSubmitting]      = useState(false);
 
-  function handleRegister() {
+  // Para saltar de un campo al siguiente con la tecla "siguiente" del teclado.
+  const emailRef    = useRef<RNTextInput>(null);
+  const phoneRef    = useRef<RNTextInput>(null);
+  const passwordRef = useRef<RNTextInput>(null);
+  const confirmRef  = useRef<RNTextInput>(null);
+
+  async function handleRegister() {
     if (!name.trim() || !email.trim() || !phone.trim() || !password || !confirmPassword) {
       Alert.alert('Campos incompletos', 'Por favor completá todos los campos.');
+      return;
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      Alert.alert('Contraseña muy corta', `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`);
       return;
     }
     if (password !== confirmPassword) {
@@ -36,139 +45,114 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
 
-    register({ name: name.trim(), email: email.trim(), phone: phone.trim(), role: 'cliente' });
-
-    navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-    Alert.alert('¡Bienvenido a HiGo!', `Hola ${name.trim()}, tu cuenta fue creada con éxito.`);
+    setSubmitting(true);
+    try {
+      const trimmedEmail = email.trim().toLowerCase();
+      await register({ name: name.trim(), email: trimmedEmail, phone: phone.trim(), password });
+      // AppNavigator escucha la sesión nueva y navega solo a VerifyEmail/MainTabs;
+      // esta alerta queda arriba de esa pantalla como confirmación explícita.
+      Alert.alert(
+        '¡Cuenta creada! 🎉',
+        `Te enviamos un correo de verificación a ${trimmedEmail}. Abrilo y confirmá tu cuenta para poder ingresar a HiGo.`
+      );
+    } catch (error: any) {
+      console.error('[register]', error?.code, error?.message, error);
+      const message =
+        error?.code === 'auth/email-already-in-use' ? 'Ese correo ya está registrado.' :
+        error?.code === 'auth/weak-password'         ? 'La contraseña debe tener al menos 6 caracteres.' :
+        error?.code === 'auth/invalid-email'          ? 'El correo ingresado no es válido.' :
+        `No se pudo crear la cuenta (${error?.code ?? 'error desconocido'}).`;
+      Alert.alert('Error', message);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
+  const mismatch = confirmPassword.length > 0 && confirmPassword !== password;
+
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}>
-        <Text style={styles.logo}>HiGo</Text>
-        <Text style={styles.subtitle}>Creá tu cuenta</Text>
-      </View>
+    <AuthScreen
+      eyebrow="Nueva cuenta"
+      title="Creá tu cuenta"
+      subtitle="Pedí del Mercado Mayorista y recibí en tu puerta."
+      onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+    >
+      <AuthField
+        label="Nombre completo"
+        icon="person-outline"
+        placeholder="Tu nombre y apellido"
+        autoCapitalize="words"
+        textContentType="name"
+        autoComplete="name"
+        returnKeyType="next"
+        onSubmitEditing={() => emailRef.current?.focus()}
+        value={name}
+        onChangeText={setName}
+      />
+      <AuthField
+        ref={emailRef}
+        label="Correo electrónico"
+        icon="mail-outline"
+        placeholder="tu@correo.com"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        textContentType="emailAddress"
+        autoComplete="email"
+        returnKeyType="next"
+        onSubmitEditing={() => phoneRef.current?.focus()}
+        value={email}
+        onChangeText={setEmail}
+      />
+      <AuthField
+        ref={phoneRef}
+        label="Teléfono"
+        icon="call-outline"
+        placeholder="09xxxxxxxx"
+        keyboardType="phone-pad"
+        textContentType="telephoneNumber"
+        autoComplete="tel"
+        value={phone}
+        onChangeText={setPhone}
+      />
+      <AuthField
+        ref={passwordRef}
+        label="Contraseña"
+        icon="lock-closed-outline"
+        placeholder="••••••••"
+        secure
+        maxLength={128}
+        textContentType="newPassword"
+        autoComplete="password-new"
+        returnKeyType="next"
+        onSubmitEditing={() => confirmRef.current?.focus()}
+        hint={`Mínimo ${MIN_PASSWORD_LENGTH} caracteres.`}
+        value={password}
+        onChangeText={setPassword}
+      />
+      <AuthField
+        ref={confirmRef}
+        label="Confirmar contraseña"
+        icon="lock-closed-outline"
+        placeholder="••••••••"
+        secure
+        maxLength={128}
+        textContentType="newPassword"
+        autoComplete="password-new"
+        returnKeyType="go"
+        onSubmitEditing={handleRegister}
+        hint={mismatch ? 'Las contraseñas no coinciden.' : undefined}
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+      />
 
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre completo"
-          placeholderTextColor="#999"
-          autoCapitalize="words"
-          value={name}
-          onChangeText={setName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Correo electrónico"
-          placeholderTextColor="#999"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Teléfono"
-          placeholderTextColor="#999"
-          keyboardType="phone-pad"
-          value={phone}
-          onChangeText={setPhone}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          placeholderTextColor="#999"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Confirmar contraseña"
-          placeholderTextColor="#999"
-          secureTextEntry
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-        />
+      <AuthPrimaryButton label="Crear cuenta" loading={submitting} onPress={handleRegister} />
 
-        <TouchableOpacity
-          style={styles.registerButton}
-          activeOpacity={0.85}
-          onPress={handleRegister}
-        >
-          <Text style={styles.registerButtonText}>Crear Cuenta</Text>
-        </TouchableOpacity>
-
-        <Pressable
-          style={({ pressed }) => [styles.loginLinkWrapper, pressed && { opacity: 0.6 }]}
-          onPress={() => navigation.navigate('Login')}
-        >
-          <Text style={styles.loginLink}>¿Ya tenés cuenta? <Text style={styles.loginLinkBold}>Iniciá sesión</Text></Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+      <AuthDivider text="¿Ya tenés cuenta?" />
+      <AuthSecondaryButton
+        label="Iniciar sesión"
+        icon="log-in-outline"
+        onPress={() => navigation.navigate('Login')}
+      />
+    </AuthScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: '#3D1F8B',
-    paddingHorizontal: 32,
-    paddingTop: 80,
-    paddingBottom: 40,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logo: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 2,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    opacity: 0.8,
-  },
-  form: {
-    gap: 16,
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: '#1A1A1A',
-  },
-  registerButton: {
-    backgroundColor: '#2ECC71',
-    borderRadius: 14,
-    paddingVertical: 18,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  registerButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  loginLinkWrapper: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  loginLink: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  loginLinkBold: {
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-  },
-});

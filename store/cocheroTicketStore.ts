@@ -1,111 +1,123 @@
 import { create } from 'zustand';
-import { calcEarning } from '../utils/earnings';
+import { collection, doc, onSnapshot, orderBy, query, updateDoc, where, Timestamp } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useAuthStore } from './authStore';
+import { claimOrderWithTickets } from './stallTicketsStore';
+import { CartItem } from './cartStore';
+import { OrderStatus } from './ordersStore';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
-
-export type TicketStatus = 'pendiente' | 'en_mercado' | 'consolidado';
-
-export interface TicketProduct {
-  name:  string;
-  qty:   string;   // "2 unidades", "5 kg", etc.
-  stall: string;   // "Puesto 14-A"
-  emoji: string;
-}
+// Ya no hay tickets inventados: cada "ticket" es un pedido real de la colección
+// "orders" con operatorRole == 'cochero'. Mientras operatorUid esté vacío el
+// pedido vive en el pool "disponibles" (cualquier cochero aprobado lo puede
+// reclamar); en cuanto se reclama pasa a "mios" y deja de aparecer para los
+// demás — lo garantizan las reglas de Firestore, no un filtro local.
 
 export interface Ticket {
-  id:          string;
-  clientName:  string;
-  orderTotal:  number;
-  earning:     number;
-  products:    TicketProduct[];
-  status:      TicketStatus;
-  timeSlot:    string;
+  id: string;
+  address: string;
+  timeSlot: string;
+  deliveryType: 'programada' | 'directa';
+  status: OrderStatus;
+  orderTotal: number;
+  // Valor de los productos (base del pago del cochero). Pedidos viejos sin
+  // desglose usan el total.
+  productSubtotal: number;
+  items: CartItem[];
+  createdAt: number;
 }
-
-// ─── Mock tickets del día ─────────────────────────────────────────────────────
-
-const MOCK_TICKETS: Ticket[] = [
-  {
-    id: '001234',
-    clientName: 'Ana Torres',
-    orderTotal: 45.00,
-    earning: calcEarning(45.00),
-    timeSlot: '10:00 - 12:00',
-    status: 'pendiente',
-    products: [
-      { name: 'Tomates', qty: '2 kg',       stall: 'Puesto 14-A', emoji: '🍅' },
-      { name: 'Papa',    qty: '5 kg',       stall: 'Puesto 8-B',  emoji: '🥔' },
-      { name: 'Cebolla', qty: '3 unidades', stall: 'Puesto 22-C', emoji: '🧅' },
-    ],
-  },
-  {
-    id: '001235',
-    clientName: 'Marco Ruiz',
-    orderTotal: 28.50,
-    earning: calcEarning(28.50),
-    timeSlot: '10:00 - 12:00',
-    status: 'pendiente',
-    products: [
-      { name: 'Naranja',  qty: '10 kg', stall: 'Puesto 5-A',  emoji: '🍊' },
-      { name: 'Limones',  qty: '2 kg',  stall: 'Puesto 5-A',  emoji: '🍋' },
-    ],
-  },
-  {
-    id: '001236',
-    clientName: 'Sofía Mendez',
-    orderTotal: 92.00,
-    earning: calcEarning(92.00),
-    timeSlot: '14:00 - 16:00',
-    status: 'pendiente',
-    products: [
-      { name: 'Arroz',   qty: '10 kg', stall: 'Puesto 31-D', emoji: '🍚' },
-      { name: 'Huevos',  qty: '30 unidades', stall: 'Puesto 19-B', emoji: '🥚' },
-      { name: 'Azúcar',  qty: '5 kg',  stall: 'Puesto 12-A', emoji: '🍬' },
-      { name: 'Fréjol',  qty: '2 kg',  stall: 'Puesto 28-C', emoji: '🫘' },
-    ],
-  },
-  {
-    id: '001237',
-    clientName: 'Diego Vargas',
-    orderTotal: 18.00,
-    earning: calcEarning(18.00),
-    timeSlot: '14:00 - 16:00',
-    status: 'pendiente',
-    products: [
-      { name: 'Zanahoria', qty: '3 kg', stall: 'Puesto 7-C',  emoji: '🥕' },
-      { name: 'Brócoli',   qty: '2 kg', stall: 'Puesto 11-A', emoji: '🥦' },
-    ],
-  },
-];
-
-// ─── Store ────────────────────────────────────────────────────────────────────
 
 interface CocheroTicketState {
-  tickets:        Ticket[];
-  disponible:     boolean;
-  toggleDisponible: () => void;
-  iniciarRecogida:  (ticketId: string) => void;
-  consolidarTodos:  () => void;
+  disponibles: Ticket[];
+  mios: Ticket[];
+  loaded: boolean;
+  reclamar: (ticketId: string) => Promise<void>;
+  marcarConsolidado: (ticketId: string) => Promise<void>;
 }
 
-export const useCocheroTicketStore = create<CocheroTicketState>((set) => ({
-  tickets:    MOCK_TICKETS,
-  disponible: true,
+function toTicket(id: string, data: any): Ticket {
+  return {
+    id,
+    address: data.address,
+    timeSlot: data.estimatedTime,
+    deliveryType: data.deliveryType ?? 'programada',
+    status: data.status,
+    orderTotal: data.total,
+    productSubtotal: data.subtotal ?? data.total,
+    items: data.items ?? [],
+    createdAt: (data.createdAt as Timestamp | undefined)?.toMillis() ?? Date.now(),
+  };
+}
 
-  toggleDisponible: () =>
-    set((s) => ({ disponible: !s.disponible })),
+export const useCocheroTicketStore = create<CocheroTicketState>()((_set, get) => ({
+  disponibles: [],
+  mios: [],
+  loaded: false,
 
-  iniciarRecogida: (ticketId) =>
-    set((s) => ({
-      tickets: s.tickets.map((t) =>
-        t.id === ticketId ? { ...t, status: 'en_mercado' } : t
-      ),
-    })),
+  reclamar: async (ticketId) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    await claimOrderWithTickets(
+      ticketId,
+      { operatorUid: user.uid, operatorName: user.name, operatorPhone: user.phone, status: 'en_mercado' },
+      { uid: user.uid, name: user.name, role: 'cochero' },
+    );
+  },
 
-  consolidarTodos: () =>
-    set((s) => ({
-      tickets: s.tickets.map((t) =>
-        t.status === 'en_mercado' ? { ...t, status: 'consolidado' } : t
-      ),
-    })),
+  // Solo para pedidos viejos, de antes de los tickets por puesto: los nuevos
+  // pasan a 'consolidado' solos cuando se retira el último puesto.
+  marcarConsolidado: async (ticketId) => {
+    const ticket = get().mios.find((t) => t.id === ticketId);
+    if (!ticket) return;
+    await updateDoc(doc(db, 'orders', ticketId), { status: 'consolidado' });
+  },
 }));
+
+// ─── Suscripciones en vivo (solo mientras la sesión sea de un cochero) ─────────
+
+let unsubDisponibles: (() => void) | null = null;
+let unsubMios: (() => void) | null = null;
+
+useAuthStore.subscribe((state) => {
+  const isCochero = state.user?.role === 'cochero' && state.user.status === 'approved';
+
+  if (isCochero && !unsubDisponibles) {
+    unsubDisponibles = onSnapshot(
+      query(
+        collection(db, 'orders'),
+        where('operatorRole', '==', 'cochero'),
+        where('status', '==', 'recibido'),
+        where('operatorUid', '==', ''),
+        orderBy('createdAt', 'asc')
+      ),
+      (snap) => {
+        // "Lo antes posible" primero; el resto, por orden de llegada. Las
+        // transferencias sin confirmar todavía no se muestran (released false).
+        const disponibles = snap.docs
+          .filter((d) => d.data().released !== false)
+          .map((d) => toTicket(d.id, d.data()))
+          .sort((a, b) =>
+            (a.deliveryType === 'directa' ? 0 : 1) - (b.deliveryType === 'directa' ? 0 : 1) ||
+            a.createdAt - b.createdAt);
+        useCocheroTicketStore.setState({ disponibles, loaded: true });
+      }
+    );
+
+    unsubMios = onSnapshot(
+      query(
+        collection(db, 'orders'),
+        where('operatorUid', '==', state.user!.uid),
+        orderBy('createdAt', 'desc')
+      ),
+      (snap) => {
+        useCocheroTicketStore.setState({ mios: snap.docs.map((d) => toTicket(d.id, d.data())) });
+      }
+    );
+  } else if (!isCochero && unsubDisponibles) {
+    unsubDisponibles();
+    unsubMios?.();
+    unsubDisponibles = null;
+    unsubMios = null;
+    useCocheroTicketStore.setState({ disponibles: [], mios: [], loaded: false });
+  }
+});

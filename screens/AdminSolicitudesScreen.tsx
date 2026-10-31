@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import {
+  useState } from 'react';
 import {
   StyleSheet,
-  Text,
   View,
+  Image,
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
@@ -10,6 +11,7 @@ import {
   Modal,
   Alert,
 } from 'react-native';
+import Text from '../components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
@@ -21,30 +23,39 @@ import {
   RejectionReason,
   REJECTION_REASONS,
 } from '../store/adminSolicitudesStore';
+import { useThemeColors } from '../theme/useThemeColors';
+import { cardShadow, floatingShadow } from '../theme/elevation';
 
 // ─── Paleta admin ─────────────────────────────────────────────────────────────
+// El indigo de header y los colores de estado (verde/rojo/ámbar) son de marca y
+// se mantienen fijos; los neutros (fondo, superficies, texto) sí reaccionan al tema.
 
-const C = {
-  header:       '#1A237E',
-  headerMid:    '#283593',
-  accent:       '#3949AB',
-  accentFaint:  '#E8EAF6',
-  green:        '#2E7D32',
-  greenFaint:   '#E8F5E9',
-  greenBorder:  '#A5D6A7',
-  red:          '#C62828',
-  redFaint:     '#FFEBEE',
-  redBorder:    '#EF9A9A',
-  amber:        '#F57F17',
-  amberFaint:   '#FFF8E1',
-  amberBorder:  '#FFE082',
-  bg:           '#F3F4F8',
-  white:        '#FFFFFF',
-  text:         '#1A1A1A',
-  textMid:      '#4A4A4A',
-  textSoft:     '#888',
-  border:       '#E0E0E8',
-};
+function useScreenColors() {
+  const T = useThemeColors();
+  return {
+    header:       '#1A237E',
+    headerMid:    '#283593',
+    accent:       '#3949AB',
+    accentFaint:  T.primaryFaint,
+    green:        '#2E7D32',
+    greenFaint:   T.successFaint,
+    greenBorder:  '#A5D6A7',
+    red:          '#C62828',
+    redFaint:     T.dangerFaint,
+    redBorder:    '#EF9A9A',
+    amber:        '#F57F17',
+    amberFaint:   T.warningFaint,
+    amberBorder:  '#FFE082',
+    bg:           T.background,
+    white:        T.surface,
+    text:         T.text,
+    textMid:      T.textSoft,
+    textSoft:     T.textFaint,
+    border:       T.border,
+    statusBar:    T.statusBarStyle,
+  };
+}
+type ScreenColors = ReturnType<typeof useScreenColors>;
 
 // ─── Config por rol ───────────────────────────────────────────────────────────
 
@@ -63,6 +74,8 @@ type Props = {
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 
 export default function AdminSolicitudesScreen({ navigation }: Props) {
+  const C = useScreenColors();
+  const styles = makeStyles(C);
   const { solicitudes, aprobar, rechazar } = useAdminSolicitudesStore();
 
   const [filter,          setFilter]          = useState<FilterTab>('todos');
@@ -114,7 +127,7 @@ export default function AdminSolicitudesScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.header} />
+      <StatusBar barStyle={C.statusBar} backgroundColor={C.header} />
 
       {/* ── Header ── */}
       <View style={styles.header}>
@@ -264,6 +277,8 @@ function SolicitudCard({
   onAprobar:  () => void;
   onRechazar: () => void;
 }) {
+  const C = useScreenColors();
+  const styles = makeStyles(C);
   const cfg       = ROLE_CFG[sol.role];
   const isPending = sol.status === 'pendiente';
   const isApproved= sol.status === 'aprobada';
@@ -319,12 +334,19 @@ function SolicitudCard({
         <Ionicons name="documents-outline" size={14} color={C.accent} />
         <Text style={styles.docsLabel}>Documentos:</Text>
         <View style={styles.docsList}>
-          {sol.documents.map((doc, i) => (
-            <View key={i} style={styles.docChip}>
-              <Ionicons name="document-attach-outline" size={12} color={C.accent} />
-              <Text style={styles.docChipText}>{doc}</Text>
-            </View>
-          ))}
+          {sol.documents.map((doc, i) => {
+            const uri = sol.photoUris?.[doc];
+            return (
+              <View key={i} style={styles.docChip}>
+                {uri ? (
+                  <Image source={{ uri }} style={styles.docThumbnail} />
+                ) : (
+                  <Ionicons name="document-attach-outline" size={12} color={C.accent} />
+                )}
+                <Text style={styles.docChipText}>{doc}</Text>
+              </View>
+            );
+          })}
         </View>
       </View>
 
@@ -356,6 +378,8 @@ function SolicitudCard({
 // ─── Stat chip ────────────────────────────────────────────────────────────────
 
 function StatChip({ label, value, color, bg }: { label: string; value: number; color: string; bg: string }) {
+  const C = useScreenColors();
+  const styles = makeStyles(C);
   return (
     <View style={[styles.statChip, { backgroundColor: bg }]}>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
@@ -383,7 +407,7 @@ function formatDate(d: Date): string {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const makeStyles = (C: ScreenColors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.header },
 
   // Header
@@ -462,11 +486,10 @@ const styles = StyleSheet.create({
     backgroundColor: C.white, borderRadius: 18,
     padding: 16, gap: 12,
     borderWidth: 1.5, borderColor: C.border,
-    shadowColor: C.header, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+    ...cardShadow(C, C.header),
   },
-  cardApproved: { borderColor: C.greenBorder, backgroundColor: '#FAFFFE' },
-  cardRejected: { borderColor: C.redBorder,   backgroundColor: '#FFFAFA' },
+  cardApproved: { borderColor: C.greenBorder, backgroundColor: C.white },
+  cardRejected: { borderColor: C.redBorder,   backgroundColor: C.white },
 
   cardTop: { flexDirection: 'row', gap: 12 },
   avatar: {
@@ -508,6 +531,7 @@ const styles = StyleSheet.create({
     borderColor: C.accent + '40', paddingHorizontal: 8, paddingVertical: 4,
   },
   docChipText: { fontSize: 11, color: C.accent, fontWeight: '600' },
+  docThumbnail: { width: 16, height: 16, borderRadius: 4 },
 
   // Rechazo
   rejectionRow: {
@@ -528,9 +552,8 @@ const styles = StyleSheet.create({
 
   approveBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 7, backgroundColor: C.green, borderRadius: 12, paddingVertical: 12,
-    shadowColor: C.green, shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3, shadowRadius: 6, elevation: 3,
+    gap: 7, backgroundColor: C.green, borderRadius: 14, paddingVertical: 12,
+    ...floatingShadow(C, C.green),
   },
   approveBtnText: { fontSize: 14, fontWeight: '700', color: C.white },
 

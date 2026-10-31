@@ -1,30 +1,45 @@
-import { useState, useEffect, useMemo } from 'react';
+import {
+  useState,
+  useEffect,
+  useMemo } from 'react';
 import {
   StyleSheet,
-  Text,
   View,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   Modal,
   SafeAreaView,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
+import Text from '../components/Text';
+import TextInput from '../components/TextInput';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HomeStackParamList } from '../navigation/types';
 import { RootStackParamList } from '../navigation/types';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
-import { PRODUCTS } from '../data/products';
+import { useOrdersStore, PaymentMethod, CASH_LIMIT } from '../store/ordersStore';
+import { usePaymentConfig } from '../store/paymentConfigStore';
+import PaymentMethodSection from '../components/PaymentMethodSection';
+import * as ImagePicker from 'expo-image-picker';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../lib/firebase';
+import { useProductsStore } from '../store/productsStore';
 import { calcTransport, TransportInfo } from '../utils/transport';
+import { useThemeColors } from '../theme/useThemeColors';
+import { ThemeColors } from '../theme/colors';
+import { cardShadow, floatingShadow } from '../theme/elevation';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const MANAGEMENT_FEE = 0.07;
+const MINIMUM_ORDER  = 15;
 
 type DeliveryType = 'programada' | 'directa';
 type TimeSlot     = '10:00 - 12:00' | '14:00 - 16:00';
@@ -32,19 +47,27 @@ type TimeSlot     = '10:00 - 12:00' | '14:00 - 16:00';
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function CheckoutScreen() {
+  const C = useThemeColors();
+  const styles = makeStyles(C);
   const navigation = useNavigation<StackNavigationProp<HomeStackParamList, 'Checkout'>>();
   const rootNav    = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route      = useRoute<RouteProp<HomeStackParamList, 'Checkout'>>();
   const { items }  = useCartStore();
-  const isRegistered = useAuthStore((s) => s.user !== null);
+  const products   = useProductsStore((s) => s.products);
+  const user          = useAuthStore((s) => s.user);
+  const isRegistered  = user !== null;
   const { clearCart } = useCartStore();
+  const createOrder   = useOrdersStore((s) => s.createOrder);
+  const [confirming, setConfirming] = useState(false);
 
   // ── Dirección ───────────────────────────────────────────────────────────────
-  const [address,   setAddress]   = useState('');
-  const [reference, setReference] = useState('');
-  const [hasMapPin, setHasMapPin] = useState(false);
-  const [pinLat,    setPinLat]    = useState<number | null>(null);
-  const [pinLng,    setPinLng]    = useState<number | null>(null);
+  // Se precarga con la dirección guardada en el perfil (si hay); elegir otra
+  // ubicación en el mapa la reemplaza solo para este pedido, sin tocar la guardada.
+  const [address,   setAddress]   = useState(user?.address ?? '');
+  const [reference, setReference] = useState(user?.addressReference ?? '');
+  const [hasMapPin, setHasMapPin] = useState(user?.addressLat != null && user?.addressLng != null);
+  const [pinLat,    setPinLat]    = useState<number | null>(user?.addressLat ?? null);
+  const [pinLng,    setPinLng]    = useState<number | null>(user?.addressLng ?? null);
 
   useEffect(() => {
     const p = route.params;
@@ -60,17 +83,40 @@ export default function CheckoutScreen() {
   const [delivery, setDelivery] = useState<DeliveryType>('programada');
   const [timeSlot, setTimeSlot] = useState<TimeSlot>('10:00 - 12:00');
 
+  // ── Pago ────────────────────────────────────────────────────────────────────
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transferencia');
+  const [receiptUri,    setReceiptUri]    = useState<string | null>(null);
+  const [paymentRef,    setPaymentRef]    = useState('');
+  const { bank, loaded: bankLoaded } = usePaymentConfig();
+
+  async function pickReceipt() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permiso necesario', 'Activá el acceso a tus fotos para subir el comprobante.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
+    if (!result.canceled && result.assets[0]) setReceiptUri(result.assets[0].uri);
+  }
+
+  async function uploadReceipt(uid: string, localUri: string): Promise<string> {
+    const blob = await (await fetch(localUri)).blob();
+    const fileRef = storageRef(storage, `receipts/${uid}/${Date.now()}.jpg`);
+    await uploadBytes(fileRef, blob, { contentType: 'image/jpeg' });
+    return getDownloadURL(fileRef);
+  }
+
   // ── Modal ───────────────────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
 
   // ── Peso total del pedido (lbs) ─────────────────────────────────────────────
   const totalWeightLbs = useMemo(() =>
     items.reduce((sum, item) => {
-      const product = PRODUCTS.find(p => p.id === item.productId);
+      const product = products.find(p => p.id === item.productId);
       const w = product?.presentations[item.presentationIndex]?.weightLbs ?? 0;
       return sum + w * item.quantity;
     }, 0),
-  [items]);
+  [items, products]);
 
   // ── Transporte calculado (Haversine) ────────────────────────────────────────
   const transport: TransportInfo | null = useMemo(() => {
@@ -84,44 +130,109 @@ export default function CheckoutScreen() {
   const transCost = transport?.cost ?? 0;
   const total     = subtotal + gestion + transCost;
 
+  // Si el total pasa el tope del efectivo (p. ej. al cambiar la ubicación y
+  // subir el envío), se vuelve a transferencia.
+  useEffect(() => {
+    if (paymentMethod === 'efectivo' && total > CASH_LIMIT) setPaymentMethod('transferencia');
+  }, [total, paymentMethod]);
+
   // ── Confirmar pedido ────────────────────────────────────────────────────────
-  function handleConfirm() {
-    if (!isRegistered) { setShowModal(true); return; }
+  async function handleConfirm() {
+    if (!isRegistered || !user) { setShowModal(true); return; }
     if (!hasMapPin) { return; }
+    if (total < MINIMUM_ORDER) {
+      Alert.alert(
+        'Pedido mínimo no alcanzado',
+        `El total debe ser al menos $${MINIMUM_ORDER.toFixed(2)}. Volvé al carrito para agregar más productos.`
+      );
+      return;
+    }
 
-    const orderId       = Date.now().toString().slice(-6);
+    if (paymentMethod === 'efectivo' && total > CASH_LIMIT) {
+      Alert.alert('Efectivo no disponible', `El pago en efectivo es solo para pedidos de hasta ${CASH_LIMIT}. Elegí transferencia.`);
+      return;
+    }
+    if (paymentMethod === 'transferencia') {
+      if (!bank) {
+        Alert.alert('Transferencia no disponible', 'Todavía no hay una cuenta bancaria configurada. Elegí otra forma de pago.');
+        return;
+      }
+      if (paymentRef.trim().length < 4) {
+        Alert.alert('Falta el comprobante', 'Escribí el número de comprobante de tu transferencia.');
+        return;
+      }
+    }
+
     const estimatedTime = delivery === 'directa' ? 'Lo antes posible' : timeSlot;
-    const operatorRole: 'cochero' | 'transportista' = transport ? 'transportista' : 'cochero';
-    const operatorName  = operatorRole === 'cochero' ? 'Carlos Pérez'    : 'Roberto Mendoza';
-    const operatorPhone = operatorRole === 'cochero' ? '+593 99 123 4567' : '+593 98 765 4321';
+    // Todo pedido pasa por un cochero (trabaja en el mercado: junta lo de
+    // cada puesto) y después por un transportista. 'directa' solo le da
+    // prioridad. Nadie queda asignado al crear el pedido — cada operativo lo
+    // reclama de verdad desde su panel.
+    const operatorRole = 'cochero' as const;
+    const deliveryType = delivery === 'directa' ? 'directa' as const : 'programada' as const;
 
-    clearCart();
-    navigation.navigate('OrderTracking', {
-      orderId,
-      address:       address || 'Dirección no especificada',
-      estimatedTime,
-      currentStatus: 'recibido',
-      operatorName,
-      operatorPhone,
-      operatorRole,
-      deliveryLat:   pinLat ?? undefined,
-      deliveryLng:   pinLng ?? undefined,
-    });
+    setConfirming(true);
+    try {
+      // La foto se sube antes de crear el pedido, para guardarla junto. Es
+      // opcional: si falla (p. ej. Storage no disponible) el pedido sigue, ya
+      // que el número de comprobante alcanza para verificar.
+      let receiptUrl: string | undefined;
+      if (paymentMethod === 'transferencia' && receiptUri) {
+        try {
+          receiptUrl = await uploadReceipt(user.uid, receiptUri);
+        } catch (err) {
+          console.error('[Checkout] receipt upload:', err);
+        }
+      }
+      const orderId = await createOrder({
+        uid:           user.uid,
+        address:       address || 'Dirección no especificada',
+        estimatedTime,
+        operatorRole,
+        deliveryType,
+        operatorName:       '',
+        operatorPhone:      '',
+        operatorUid:        '',
+        transportistaName:  '',
+        transportistaPhone: '',
+        transportistaUid:   '',
+        deliveryLat:   pinLat ?? undefined,
+        deliveryLng:   pinLng ?? undefined,
+        subtotal,
+        managementFee: gestion,
+        shippingCost:  transCost,
+        vehicle:       transport?.vehicle,
+        paymentMethod,
+        // Transferencia: queda retenido hasta que el admin confirme el pago.
+        paymentStatus: paymentMethod === 'transferencia' ? 'por_verificar' : 'contra_entrega',
+        released:      paymentMethod === 'efectivo',
+        ...(receiptUrl ? { receiptUrl } : {}),
+        ...(paymentMethod === 'transferencia' ? { paymentRef: paymentRef.trim() } : {}),
+        total,
+        items,
+      });
+      clearCart();
+      navigation.navigate('OrderTracking', { orderId });
+    } catch {
+      Alert.alert('No se pudo confirmar el pedido', 'Revisá tu conexión e intentá de nuevo.');
+    } finally {
+      setConfirming(false);
+    }
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#3D1F8B" />
+      <StatusBar barStyle={C.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={styles.header}>
+      <LinearGradient colors={C.headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Finalizar pedido</Text>
         <View style={styles.headerBtn} />
-      </View>
+      </LinearGradient>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
@@ -134,7 +245,7 @@ export default function CheckoutScreen() {
           {/* ── Sección: Dirección ── */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="location-outline" size={20} color="#3D1F8B" />
+              <Ionicons name="location-outline" size={20} color={C.primary} />
               <Text style={styles.sectionTitle}>Dirección de entrega</Text>
             </View>
 
@@ -148,7 +259,7 @@ export default function CheckoutScreen() {
                 <Ionicons
                   name={hasMapPin ? 'location' : 'location-outline'}
                   size={22}
-                  color={hasMapPin ? '#FFFFFF' : '#3D1F8B'}
+                  color={hasMapPin ? '#FFFFFF' : C.primary}
                 />
               </View>
               <View style={styles.mapBtnContent}>
@@ -167,7 +278,7 @@ export default function CheckoutScreen() {
               <Ionicons
                 name={hasMapPin ? 'pencil-outline' : 'chevron-forward'}
                 size={17}
-                color={hasMapPin ? '#3D1F8B' : '#9B8EC4'}
+                color={hasMapPin ? C.primary : C.textFaint}
               />
             </TouchableOpacity>
 
@@ -188,7 +299,7 @@ export default function CheckoutScreen() {
                 </View>
                 <View style={styles.transportDivider} />
                 <View style={styles.transportWeightRow}>
-                  <Ionicons name="scale-outline" size={13} color="#9B8EC4" />
+                  <Ionicons name="scale-outline" size={13} color={C.textFaint} />
                   <Text style={styles.transportWeightText}>
                     Pedido: {totalWeightLbs.toFixed(1)} lbs ·{' '}
                     {totalWeightLbs < 30
@@ -202,7 +313,7 @@ export default function CheckoutScreen() {
             ) : (
               hasMapPin === false && (
                 <View style={styles.transportPlaceholder}>
-                  <Ionicons name="information-circle-outline" size={15} color="#9B8EC4" />
+                  <Ionicons name="information-circle-outline" size={15} color={C.textFaint} />
                   <Text style={styles.transportPlaceholderText}>
                     Selecciona tu ubicación para calcular el costo de transporte
                   </Text>
@@ -212,11 +323,11 @@ export default function CheckoutScreen() {
 
             {/* Campo de referencia */}
             <View style={styles.inputWrapper}>
-              <Ionicons name="flag-outline" size={16} color="#9B8EC4" style={styles.inputIcon} />
+              <Ionicons name="flag-outline" size={16} color={C.textFaint} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Referencia: Casa azul junto al parque"
-                placeholderTextColor="#BEB3E0"
+                placeholderTextColor={C.textFaint}
                 value={reference}
                 onChangeText={setReference}
                 returnKeyType="done"
@@ -227,7 +338,7 @@ export default function CheckoutScreen() {
           {/* ── Sección: Horario ── */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="time-outline" size={20} color="#3D1F8B" />
+              <Ionicons name="time-outline" size={20} color={C.primary} />
               <Text style={styles.sectionTitle}>Horario de entrega</Text>
             </View>
 
@@ -263,7 +374,7 @@ export default function CheckoutScreen() {
                       activeOpacity={0.8}
                       onPress={() => setTimeSlot(slot)}
                     >
-                      <Ionicons name="sunny-outline" size={13} color={timeSlot === slot ? '#3D1F8B' : '#9B8EC4'} />
+                      <Ionicons name="sunny-outline" size={13} color={timeSlot === slot ? C.primary : C.textFaint} />
                       <Text style={[styles.slotText, timeSlot === slot && styles.slotTextActive]}>{slot}</Text>
                     </TouchableOpacity>
                   ))}
@@ -297,10 +408,29 @@ export default function CheckoutScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* ── Sección: Forma de pago ── */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="wallet-outline" size={20} color={C.primary} />
+              <Text style={styles.sectionTitle}>Forma de pago</Text>
+            </View>
+            <PaymentMethodSection
+              total={total}
+              method={paymentMethod}
+              onMethodChange={setPaymentMethod}
+              bank={bank}
+              bankLoaded={bankLoaded}
+              receiptUri={receiptUri}
+              onPickReceipt={pickReceipt}
+              paymentRef={paymentRef}
+              onPaymentRef={setPaymentRef}
+            />
+          </View>
+
           {/* ── Sección: Resumen final ── */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="receipt-outline" size={20} color="#3D1F8B" />
+              <Ionicons name="receipt-outline" size={20} color={C.primary} />
               <Text style={styles.sectionTitle}>Resumen final</Text>
             </View>
 
@@ -351,13 +481,20 @@ export default function CheckoutScreen() {
 
           {/* ── Botón confirmar ── */}
           <TouchableOpacity
-            style={[styles.confirmBtn, !hasMapPin && styles.confirmBtnDisabled]}
+            style={[styles.confirmBtn, (!hasMapPin || total < MINIMUM_ORDER || confirming) && styles.confirmBtnDisabled]}
             activeOpacity={0.85}
             onPress={handleConfirm}
+            disabled={confirming}
           >
             <Ionicons name="checkmark-circle-outline" size={22} color="#FFFFFF" />
             <Text style={styles.confirmBtnText}>
-              {hasMapPin ? 'Confirmar pedido' : 'Selecciona tu ubicación primero'}
+              {confirming
+                ? 'Confirmando…'
+                : !hasMapPin
+                ? 'Selecciona tu ubicación primero'
+                : total < MINIMUM_ORDER
+                ? `Pedido mínimo $${MINIMUM_ORDER.toFixed(2)}`
+                : 'Confirmar pedido'}
             </Text>
           </TouchableOpacity>
 
@@ -369,7 +506,7 @@ export default function CheckoutScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalIconWrapper}>
-              <Ionicons name="person-circle-outline" size={52} color="#3D1F8B" />
+              <Ionicons name="person-circle-outline" size={52} color={C.primary} />
             </View>
             <Text style={styles.modalTitle}>¡Casi listo!</Text>
             <Text style={styles.modalBody}>
@@ -396,96 +533,93 @@ export default function CheckoutScreen() {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#3D1F8B' },
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.headerGradient[0] },
 
   // Header
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#3D1F8B',
+    paddingHorizontal: 16, paddingVertical: 12,
   },
   headerBtn: {
     width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
     borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF' },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.3 },
 
   // Scroll
-  scroll: { backgroundColor: '#F7F5FF', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  scroll: { backgroundColor: C.background, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   scrollContent: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 40, gap: 20 },
 
   // Sección genérica
   section: { gap: 12 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: C.text, letterSpacing: -0.2 },
 
   // Botón del mapa
   mapBtn: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FFFFFF', borderRadius: 16,
-    borderWidth: 2, borderColor: '#E0D9F5',
+    backgroundColor: C.surface, borderRadius: 18,
+    borderWidth: 2, borderColor: C.border,
     padding: 14, gap: 12,
-    shadowColor: '#3D1F8B', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    ...cardShadow(C),
   },
-  mapBtnActive: { borderColor: '#3D1F8B', backgroundColor: '#F3F0FF' },
+  mapBtnActive: { borderColor: C.primary, backgroundColor: C.primaryFaint },
   mapBtnIcon: {
     width: 44, height: 44, borderRadius: 12,
-    backgroundColor: '#EDE7F6', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.primaryFaint, alignItems: 'center', justifyContent: 'center',
   },
-  mapBtnIconActive: { backgroundColor: '#3D1F8B' },
+  mapBtnIconActive: { backgroundColor: C.primary },
   mapBtnContent: { flex: 1, gap: 2 },
-  mapBtnLabel: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
-  mapBtnAddress: { fontSize: 13, color: '#3D1F8B', fontWeight: '500', lineHeight: 18 },
-  mapBtnSub: { fontSize: 12, color: '#9B8EC4' },
+  mapBtnLabel: { fontSize: 14, fontWeight: '700', color: C.text },
+  mapBtnAddress: { fontSize: 13, color: C.primary, fontWeight: '500', lineHeight: 18 },
+  mapBtnSub: { fontSize: 12, color: C.textFaint },
 
   // Card de transporte
   transportCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16,
-    borderWidth: 1.5, borderColor: '#3D1F8B',
+    backgroundColor: C.surface, borderRadius: 18,
+    borderWidth: 1.5, borderColor: C.primary,
     padding: 14, gap: 10,
-    shadowColor: '#3D1F8B', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 6, elevation: 2,
+    ...cardShadow(C),
   },
   transportTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   transportEmoji: { fontSize: 32 },
   transportInfo: { flex: 1, gap: 2 },
-  transportVehicle: { fontSize: 15, fontWeight: '800', color: '#1A1A1A' },
-  transportDetail: { fontSize: 12, color: '#9B8EC4', lineHeight: 16 },
+  transportVehicle: { fontSize: 15, fontWeight: '800', color: C.text },
+  transportDetail: { fontSize: 12, color: C.textFaint, lineHeight: 16 },
   transportCostBadge: {
-    backgroundColor: '#EDE7F6', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5,
+    backgroundColor: C.primaryFaint, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5,
   },
-  transportCostText: { fontSize: 16, fontWeight: '800', color: '#3D1F8B' },
-  transportDivider: { height: 1, backgroundColor: '#E0D9F5' },
+  transportCostText: { fontSize: 16, fontWeight: '800', color: C.primary },
+  transportDivider: { height: 1, backgroundColor: C.border },
   transportWeightRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  transportWeightText: { fontSize: 12, color: '#9B8EC4', flex: 1 },
+  transportWeightText: { fontSize: 12, color: C.textFaint, flex: 1 },
 
   // Placeholder transporte
   transportPlaceholder: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 7,
-    backgroundColor: '#F3F0FF', borderRadius: 12, padding: 12,
+    backgroundColor: C.primaryFaint, borderRadius: 12, padding: 12,
   },
-  transportPlaceholderText: { flex: 1, fontSize: 13, color: '#9B8EC4', lineHeight: 18 },
+  transportPlaceholderText: { flex: 1, fontSize: 13, color: C.textFaint, lineHeight: 18 },
 
   // Input referencia
   inputWrapper: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FFFFFF', borderRadius: 14,
-    borderWidth: 1.5, borderColor: '#E0D9F5',
+    backgroundColor: C.surface, borderRadius: 14,
+    borderWidth: 1.5, borderColor: C.border,
     paddingHorizontal: 14, paddingVertical: 4, gap: 8,
   },
   inputIcon: { marginRight: 2 },
-  input: { flex: 1, fontSize: 14, color: '#1A1A1A', paddingVertical: 13 },
+  input: { flex: 1, fontSize: 14, color: C.text, paddingVertical: 13 },
 
   // Tarjetas de horario
   deliveryCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16,
-    borderWidth: 2, borderColor: '#E0D9F5',
+    backgroundColor: C.surface, borderRadius: 18,
+    borderWidth: 2, borderColor: C.border,
     padding: 16, gap: 12,
-    shadowColor: '#3D1F8B', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    ...cardShadow(C),
   },
-  deliveryCardActive: { borderColor: '#3D1F8B', backgroundColor: '#F3F0FF' },
+  deliveryCardActive: { borderColor: C.primary, backgroundColor: C.primaryFaint },
   deliveryCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   deliveryCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   radioOuter: {
@@ -493,21 +627,21 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: '#BEB3E0',
     alignItems: 'center', justifyContent: 'center',
   },
-  radioOuterActive: { borderColor: '#3D1F8B' },
-  radioInner: { width: 11, height: 11, borderRadius: 6, backgroundColor: '#3D1F8B' },
-  deliveryCardTitle: { fontSize: 15, fontWeight: '700', color: '#555' },
-  deliveryCardTitleActive: { color: '#3D1F8B' },
-  deliveryCardSub: { fontSize: 12, color: '#9B8EC4', marginTop: 2 },
+  radioOuterActive: { borderColor: C.primary },
+  radioInner: { width: 11, height: 11, borderRadius: 6, backgroundColor: C.primary },
+  deliveryCardTitle: { fontSize: 15, fontWeight: '700', color: C.textSoft },
+  deliveryCardTitleActive: { color: C.primary },
+  deliveryCardSub: { fontSize: 12, color: C.textFaint, marginTop: 2 },
 
   savingBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: '#EAFAF1', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+    backgroundColor: C.successFaint, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
   },
-  savingBadgeText: { fontSize: 11, fontWeight: '700', color: '#2ECC71' },
+  savingBadgeText: { fontSize: 11, fontWeight: '700', color: C.success },
 
   urgentBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: '#FEF0E0', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+    backgroundColor: C.warningFaint, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
   },
   urgentBadgeText: { fontSize: 11, fontWeight: '700', color: '#E67E22' },
 
@@ -515,39 +649,37 @@ const styles = StyleSheet.create({
   slotBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 5, paddingVertical: 10, borderRadius: 10,
-    borderWidth: 1.5, borderColor: '#E0D9F5', backgroundColor: '#FFFFFF',
+    borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface,
   },
-  slotBtnActive: { borderColor: '#3D1F8B', backgroundColor: '#EDE7F6' },
-  slotText: { fontSize: 13, fontWeight: '600', color: '#9B8EC4' },
-  slotTextActive: { color: '#3D1F8B' },
+  slotBtnActive: { borderColor: C.primary, backgroundColor: C.primaryFaint },
+  slotText: { fontSize: 13, fontWeight: '600', color: C.textFaint },
+  slotTextActive: { color: C.primary },
 
   // Resumen
   summaryBox: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, gap: 12,
-    shadowColor: '#3D1F8B', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+    backgroundColor: C.surface, borderRadius: 18, padding: 18, gap: 12,
+    ...cardShadow(C),
   },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   summaryLabelRow: { flexDirection: 'column', gap: 4, flex: 1, marginRight: 8 },
-  summaryLabel: { fontSize: 14, color: '#555' },
-  summaryValue: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
+  summaryLabel: { fontSize: 14, color: C.textSoft },
+  summaryValue: { fontSize: 14, fontWeight: '700', color: C.text },
   summaryPending: { fontSize: 13, color: '#BEB3E0', fontStyle: 'italic' },
   vehicleChip: {
-    alignSelf: 'flex-start', backgroundColor: '#F3F0FF',
+    alignSelf: 'flex-start', backgroundColor: C.primaryFaint,
     borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
   },
-  vehicleChipText: { fontSize: 11, color: '#3D1F8B', fontWeight: '600' },
-  summaryDivider: { height: 1, backgroundColor: '#E0D9F5', marginVertical: 2 },
-  totalLabel: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
-  totalValue: { fontSize: 22, fontWeight: '800', color: '#3D1F8B' },
+  vehicleChipText: { fontSize: 11, color: C.primary, fontWeight: '600' },
+  summaryDivider: { height: 1, backgroundColor: C.border, marginVertical: 2 },
+  totalLabel: { fontSize: 16, fontWeight: '700', color: C.text },
+  totalValue: { fontSize: 22, fontWeight: '800', color: C.primary },
   totalNote: { fontSize: 11, color: '#BEB3E0', fontStyle: 'italic', textAlign: 'center' },
 
   // Botón confirmar
   confirmBtn: {
-    backgroundColor: '#2ECC71', flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 10, paddingVertical: 18, borderRadius: 16,
-    shadowColor: '#2ECC71', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    backgroundColor: C.success, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 10, paddingVertical: 18, borderRadius: 18,
+    ...floatingShadow(C, C.success),
   },
   confirmBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
   confirmBtnDisabled: {
@@ -562,23 +694,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28,
   },
   modalCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 24, padding: 28,
+    backgroundColor: C.surface, borderRadius: 24, padding: 28,
     width: '100%', alignItems: 'center', gap: 14,
-    shadowColor: '#3D1F8B', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2, shadowRadius: 20, elevation: 10,
+    ...floatingShadow(C),
   },
   modalIconWrapper: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: '#F3F0FF', alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+    backgroundColor: C.primaryFaint, alignItems: 'center', justifyContent: 'center', marginBottom: 4,
   },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: '#1A1A1A' },
-  modalBody: { fontSize: 14, color: '#555', textAlign: 'center', lineHeight: 21 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: C.text, letterSpacing: -0.3 },
+  modalBody: { fontSize: 14, color: C.textSoft, textAlign: 'center', lineHeight: 21 },
   modalPrimaryBtn: {
-    backgroundColor: '#3D1F8B', flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.primary, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center', gap: 8, paddingVertical: 15, borderRadius: 14,
     width: '100%', marginTop: 4,
   },
   modalPrimaryBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   modalSecondaryBtn: { paddingVertical: 12, width: '100%', alignItems: 'center' },
-  modalSecondaryBtnText: { fontSize: 15, color: '#9B8EC4', fontWeight: '600' },
+  modalSecondaryBtnText: { fontSize: 15, color: C.textFaint, fontWeight: '600' },
 });

@@ -31,6 +31,7 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
@@ -42,3 +43,6 @@ yarn-error.*
 
 # Claude Code local settings
 .claude/
+
+# caché de deploys de Firebase
+.firebase/

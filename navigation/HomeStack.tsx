@@ -6,6 +6,7 @@ import ProductScreen from '../screens/ProductScreen';
 import CarritoScreen from '../screens/CarritoScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import MapPickerScreen from '../screens/MapPickerScreen';
+import AddressSetupScreen from '../screens/AddressSetupScreen';
 import OrderTrackingScreen from '../screens/OrderTrackingScreen';
 
 const Stack = createStackNavigator<HomeStackParamList>();
@@ -16,7 +17,7 @@ export default function HomeStack() {
       screenOptions={{
         headerStyle: { backgroundColor: '#3D1F8B' },
         headerTintColor: '#FFFFFF',
-        headerTitleStyle: { fontWeight: '700', fontSize: 18 },
+        headerTitleStyle: { fontFamily: 'Poppins_700Bold', fontSize: 18 },
         headerBackTitleVisible: false,
       }}
     >
@@ -44,6 +45,11 @@ export default function HomeStack() {
       <Stack.Screen
         name="MapPicker"
         component={MapPickerScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddressSetup"
+        component={AddressSetupScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

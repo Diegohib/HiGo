@@ -1,19 +1,25 @@
-import { useState } from 'react';
+import {
+  useState } from 'react';
 import {
   StyleSheet,
-  Text,
   View,
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  Image,
   Alert,
 } from 'react-native';
+import Text from '../components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HomeStackParamList } from '../navigation/types';
-import { PRODUCTS } from '../data/products';
+import { useProductsStore } from '../store/productsStore';
 import { useCartStore } from '../store/cartStore';
+import { useFavoritesStore } from '../store/favoritesStore';
+import { useThemeColors } from '../theme/useThemeColors';
+import { ThemeColors } from '../theme/colors';
+import { cardShadow, floatingShadow } from '../theme/elevation';
 
 type Props = {
   navigation: StackNavigationProp<HomeStackParamList, 'Product'>;
@@ -21,10 +27,27 @@ type Props = {
 };
 
 export default function ProductScreen({ navigation, route }: Props) {
-  const product = PRODUCTS.find(p => p.id === route.params.productId)!;
+  const C = useThemeColors();
+  const styles = makeStyles(C);
+  const products = useProductsStore(s => s.products);
+  const product = products.find(p => p.id === route.params.productId);
   const [selectedPresentation, setSelectedPresentation] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const addItem = useCartStore(s => s.addItem);
+  const isFavorite = useFavoritesStore(s => product ? s.productIds.includes(product.id) : false);
+  const toggleFavorite = useFavoritesStore(s => s.toggleFavorite);
+
+  if (!product) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.notFound]}>
+        <Ionicons name="alert-circle-outline" size={48} color="#9B8EC4" />
+        <Text style={styles.notFoundText}>No se encontró este producto.</Text>
+        <TouchableOpacity style={styles.notFoundBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.notFoundBtnText}>Volver</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   const currentPresentation = product.presentations[selectedPresentation];
   const totalPrice = (currentPresentation.price * quantity).toFixed(2);
@@ -34,7 +57,7 @@ export default function ProductScreen({ navigation, route }: Props) {
 
   function handleAddToCart() {
     addItem({
-      productId: product.id,
+      productId: product!.id,
       presentationIndex: selectedPresentation,
       presentationLabel: currentPresentation.label,
       presentationPrice: currentPresentation.price,
@@ -42,7 +65,7 @@ export default function ProductScreen({ navigation, route }: Props) {
     });
     Alert.alert(
       'Agregado al carrito',
-      `${product.name} (${currentPresentation.label}) x${quantity}`,
+      `${product!.name} (${currentPresentation.label}) x${quantity}`,
       [
         { text: 'Seguir comprando', style: 'cancel' },
         { text: 'Ver carrito', onPress: () => navigation.navigate('Carrito') },
@@ -55,8 +78,15 @@ export default function ProductScreen({ navigation, route }: Props) {
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* ── Imagen / Hero ── */}
-        <View style={[styles.hero, { backgroundColor: product.emojiColor }]}>
-          <Text style={styles.heroEmoji}>{product.emoji}</Text>
+        <View style={styles.hero}>
+          <Image source={{ uri: product.image }} style={styles.heroImage} resizeMode="cover" />
+          <TouchableOpacity
+            style={styles.favoriteBtn}
+            activeOpacity={0.75}
+            onPress={() => toggleFavorite(product.id)}
+          >
+            <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={22} color={isFavorite ? C.danger : C.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* ── Contenido ── */}
@@ -108,11 +138,11 @@ export default function ProductScreen({ navigation, route }: Props) {
             </View>
             <View style={styles.qtySelector}>
               <TouchableOpacity style={styles.qtyBtn} onPress={decrement} activeOpacity={0.7}>
-                <Ionicons name="remove" size={18} color="#3D1F8B" />
+                <Ionicons name="remove" size={18} color={C.primary} />
               </TouchableOpacity>
               <Text style={styles.qtyValue}>{quantity}</Text>
               <TouchableOpacity style={styles.qtyBtn} onPress={increment} activeOpacity={0.7}>
-                <Ionicons name="add" size={18} color="#3D1F8B" />
+                <Ionicons name="add" size={18} color={C.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -135,25 +165,65 @@ export default function ProductScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#F7F5FF',
+    backgroundColor: C.background,
+  },
+
+  // No encontrado
+  notFound: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    paddingHorizontal: 32,
+  },
+  notFoundText: {
+    fontSize: 15,
+    color: C.textSoft,
+    textAlign: 'center',
+  },
+  notFoundBtn: {
+    backgroundColor: C.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+  },
+  notFoundBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 
   // Hero
   hero: {
     height: 260,
+    backgroundColor: C.surfaceAlt,
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  favoriteBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  heroEmoji: {
-    fontSize: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
 
   // Contenido
   content: {
-    backgroundColor: '#F7F5FF',
+    backgroundColor: C.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     marginTop: -20,
@@ -174,16 +244,17 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#1A1A1A',
+    color: C.text,
     lineHeight: 30,
+    letterSpacing: -0.4,
   },
   productSubcat: {
     fontSize: 14,
-    color: '#9B8EC4',
+    color: C.textFaint,
     marginTop: 2,
   },
   subcatBadge: {
-    backgroundColor: '#EDE7F6',
+    backgroundColor: C.primaryFaint,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -193,13 +264,13 @@ const styles = StyleSheet.create({
   subcatBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#3D1F8B',
+    color: C.primary,
   },
 
   // Descripción
   description: {
     fontSize: 14,
-    color: '#555',
+    color: C.textSoft,
     lineHeight: 22,
     marginBottom: 24,
   },
@@ -208,7 +279,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.text,
     marginBottom: 12,
   },
   pillsRow: {
@@ -221,17 +292,17 @@ const styles = StyleSheet.create({
     borderRadius: 22,
   },
   pillActive: {
-    backgroundColor: '#3D1F8B',
+    backgroundColor: C.primary,
   },
   pillInactive: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: '#3D1F8B',
+    borderColor: C.primary,
   },
   pillText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#3D1F8B',
+    color: C.primary,
   },
   pillTextActive: {
     color: '#FFFFFF',
@@ -246,19 +317,19 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 13,
-    color: '#9B8EC4',
+    color: C.textFaint,
     marginBottom: 2,
   },
   priceValue: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#2ECC71',
+    color: C.primary,
   },
   qtySelector: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#EDE7F6',
+    backgroundColor: C.primaryFaint,
     borderRadius: 14,
     paddingHorizontal: 6,
     paddingVertical: 6,
@@ -267,14 +338,14 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   qtyValue: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#3D1F8B',
+    color: C.primary,
     minWidth: 24,
     textAlign: 'center',
   },
@@ -284,41 +355,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: C.surface,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 24,
-    shadowColor: '#3D1F8B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 2,
+    ...cardShadow(C),
   },
   totalLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#555',
+    color: C.textSoft,
   },
   totalValue: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#3D1F8B',
+    color: C.primary,
   },
 
   // Botón carrito
   cartButton: {
-    backgroundColor: '#2ECC71',
+    backgroundColor: C.success,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
     paddingVertical: 18,
-    borderRadius: 16,
-    shadowColor: '#2ECC71',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    borderRadius: 18,
+    ...floatingShadow(C, C.success),
   },
   cartButtonText: {
     color: '#FFFFFF',

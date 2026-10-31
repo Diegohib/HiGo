@@ -1,14 +1,37 @@
-import { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, Alert,
+  useEffect,
+  useRef,
+  useState,
+  ReactNode } from 'react';
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  StatusBar,
+  Alert,
+  Animated,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import Text from '../components/Text';
+import TextInput from '../components/TextInput';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
-import { useComercianteStore, DispatchTicket, DaySale } from '../store/comercianteStore';
+import { useComercianteStore, DaySale } from '../store/comercianteStore';
+import { StallTicket, marcarListo } from '../store/stallTicketsStore';
 import { useAuthStore } from '../store/authStore';
-import { formatShortDate } from '../utils/earnings';
+import { useThemeColors } from '../theme/useThemeColors';
+import { cardShadow, floatingShadow } from '../theme/elevation';
+import { ThemeColors } from '../theme/colors';
+import { pickAvatarPhoto } from '../lib/pickAvatarPhoto';
+import Avatar from '../components/Avatar';
+import AppearanceSelector from '../components/AppearanceSelector';
+import { formatShortDate, isToday } from '../utils/earnings';
+import { shortName } from '../utils/name';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'ComercianteDashboard'>;
@@ -16,54 +39,102 @@ type Props = {
 
 type Tab = 'pedidos' | 'ganancias' | 'perfil';
 
-const HEADER   = '#C4623A';
-const HEADER2  = '#A0390E';
-const BG       = '#FDF6F3';
+// Morado de marca de la app: color de este dashboard (fijo en ambos temas,
+// igual que en Cochero y Transportista — los 3 comparten identidad).
+const HEADER  = '#3D1F8B';
+const HEADER2 = '#2D1570';
+
+// ─── Entrada animada (fade + rise) reutilizada por cada tab ───────────────────
+
+function FadeIn({ children, style }: { children: ReactNode; style?: object }) {
+  const fade = useRef(new Animated.Value(0)).current;
+  const rise = useRef(new Animated.Value(12)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 1, duration: 380, useNativeDriver: true }),
+      Animated.spring(rise, { toValue: 0, friction: 9, tension: 50, useNativeDriver: true }),
+    ]).start();
+  }, []);
+  return (
+    <Animated.View style={[style, { opacity: fade, transform: [{ translateY: rise }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
 
 // ─── Tab: Despachos ───────────────────────────────────────────────────────────
 
-function TicketCard({ ticket, onConfirm }: { ticket: DispatchTicket; onConfirm: () => void }) {
+// Un ticket = lo que este puesto tiene que preparar para un pedido. El
+// comerciante lo marca 'listo'; quien recoge (cochero o transportista) lo
+// marca 'retirado' al llevárselo.
+
+function TicketCard({ ticket, onListo }: { ticket: StallTicket; onListo?: () => void }) {
+  const T = useThemeColors();
+  const tc = makeTcStyles(T);
   const isRetirado = ticket.status === 'retirado';
-  const hora = ticket.scheduledAt.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+  const isListo    = ticket.status === 'listo';
+
+  const badgeColor = isRetirado ? T.success : isListo ? HEADER : T.warning;
+  const badgeLabel = isRetirado ? 'Retirado' : isListo ? 'Listo' : 'Por preparar';
+  const badgeIcon: keyof typeof Ionicons.glyphMap =
+    isRetirado ? 'checkmark-circle' : isListo ? 'bag-check-outline' : 'time-outline';
+
+  const pickerRoleLabel = ticket.pickerRole === 'transportista' ? 'Transportista' : 'Cochero';
 
   return (
     <View style={[tc.card, isRetirado && tc.cardDone]}>
-      {/* Header ticket */}
+      {/* Header ticket: quién retira */}
       <View style={tc.cardTop}>
         <View style={tc.cocheroRow}>
           <View style={tc.cocheroIconBox}>
-            <Ionicons name="bicycle-outline" size={22} color={HEADER} />
+            <Ionicons
+              name={ticket.pickerRole === 'transportista' ? 'car-outline' : 'bicycle-outline'}
+              size={22}
+              color={HEADER}
+            />
           </View>
-          <View>
-            <Text style={tc.cocheroName}>{ticket.cocheroName}</Text>
-            <Text style={tc.cocheroLabel}>Cochero asignado · retira a las {hora}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={tc.cocheroName}>{ticket.pickerName || 'Esperando quién retire'}</Text>
+            <Text style={tc.cocheroLabel}>
+              {ticket.pickerName ? `${pickerRoleLabel} · ` : ''}
+              {ticket.route === 'directa' ? 'Lo antes posible' : ticket.estimatedTime}
+            </Text>
           </View>
         </View>
-        <View style={[tc.statusBadge, isRetirado ? tc.badgeDone : tc.badgePending]}>
-          <Text style={tc.statusBadgeText}>{isRetirado ? 'Retirado ✓' : 'Pendiente'}</Text>
+        <View style={[tc.statusBadge, { backgroundColor: badgeColor + '1A' }]}>
+          <Ionicons name={badgeIcon} size={12} color={badgeColor} style={{ marginRight: 4 }} />
+          <Text style={[tc.statusBadgeText, { color: badgeColor }]}>{badgeLabel}</Text>
         </View>
       </View>
 
       {/* Items */}
       <View style={tc.divider} />
-      <Text style={tc.orderIdLabel}>Pedido {ticket.orderId}</Text>
-      {ticket.items.map((item, i) => (
-        <View key={i} style={tc.itemRow}>
-          <Text style={tc.itemDot}>·</Text>
-          <Text style={tc.itemText}>
-            {item.productName} — <Text style={tc.itemQty}>{item.qty} {item.unit}</Text>
-          </Text>
-        </View>
-      ))}
+      <Text style={tc.orderIdLabel}>Pedido #{ticket.orderId.slice(0, 6)}</Text>
+      <View style={tc.itemsBox}>
+        {ticket.items.map((item, i) => (
+          <View key={i} style={tc.itemRow}>
+            <View style={tc.itemDot} />
+            <Text style={tc.itemText}>{item.productName}</Text>
+            <Text style={tc.itemQty}>{item.quantity} {item.presentationLabel}</Text>
+          </View>
+        ))}
+      </View>
 
       {/* Footer */}
       <View style={tc.divider} />
       <View style={tc.cardBottom}>
-        <Text style={tc.subtotalText}>Subtotal: <Text style={tc.subtotalAmount}>${ticket.subtotal.toFixed(2)}</Text></Text>
-        {!isRetirado && (
-          <TouchableOpacity style={tc.confirmBtn} onPress={onConfirm} activeOpacity={0.85}>
-            <Text style={tc.confirmBtnText}>Confirmar retiro</Text>
+        <View>
+          <Text style={tc.subtotalLabel}>Subtotal</Text>
+          <Text style={tc.subtotalAmount}>${ticket.subtotal.toFixed(2)}</Text>
+        </View>
+        {ticket.status === 'pendiente' && onListo && (
+          <TouchableOpacity style={tc.confirmBtn} onPress={onListo} activeOpacity={0.85}>
+            <Ionicons name="checkmark" size={15} color="#FFFFFF" />
+            <Text style={tc.confirmBtnText}>Marcar listo</Text>
           </TouchableOpacity>
+        )}
+        {isListo && (
+          <Text style={tc.cocheroLabel}>Esperando que lo retiren</Text>
         )}
       </View>
     </View>
@@ -71,213 +142,171 @@ function TicketCard({ ticket, onConfirm }: { ticket: DispatchTicket; onConfirm: 
 }
 
 function DespachosTab() {
-  const { dispatchTickets, markRetirado } = useComercianteStore();
+  const T = useThemeColors();
+  const tc = makeTcStyles(T);
+  const { dispatchTickets, loaded } = useComercianteStore();
 
-  const pendientes = dispatchTickets.filter(t => t.status === 'pendiente');
-  const retirados  = dispatchTickets.filter(t => t.status === 'retirado');
+  const porPreparar  = dispatchTickets.filter(t => t.status === 'pendiente');
+  const listos       = dispatchTickets.filter(t => t.status === 'listo');
+  const retiradosHoy = dispatchTickets.filter(t =>
+    t.status === 'retirado' && t.retiradoAt != null && isToday(new Date(t.retiradoAt)));
 
-  function handleConfirm(ticket: DispatchTicket) {
+  function handleListo(ticket: StallTicket) {
     Alert.alert(
-      'Confirmar retiro',
-      `¿El cochero ${ticket.cocheroName} ya retiró los productos del pedido ${ticket.orderId}?`,
+      'Marcar listo',
+      `¿Ya preparaste los productos del pedido #${ticket.orderId.slice(0, 6)}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sí, retirado', onPress: () => markRetirado(ticket.id) },
+        {
+          text: 'Sí, está listo',
+          onPress: () => marcarListo(ticket.id).catch((err) => {
+            console.error('[ComercianteDashboard] marcar listo:', err);
+            Alert.alert('Error', 'No se pudo marcar como listo. Intentá de nuevo.');
+          }),
+        },
       ],
     );
   }
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={tc.scroll} showsVerticalScrollIndicator={false}>
-      {pendientes.length > 0 && (
-        <>
-          <Text style={tc.groupLabel}>Por despachar ({pendientes.length})</Text>
-          {pendientes.map(t => (
-            <TicketCard key={t.id} ticket={t} onConfirm={() => handleConfirm(t)} />
-          ))}
-        </>
-      )}
-      {retirados.length > 0 && (
-        <>
-          <Text style={[tc.groupLabel, { color: '#888', marginTop: 16 }]}>Retirados hoy ({retirados.length})</Text>
-          {retirados.map(t => (
-            <TicketCard key={t.id} ticket={t} onConfirm={() => {}} />
-          ))}
-        </>
-      )}
-      {pendientes.length === 0 && retirados.length === 0 && (
-        <View style={tc.emptyBox}>
-          <Ionicons name="checkmark-circle-outline" size={48} color="#4CAF50" />
-          <Text style={tc.emptyText}>Sin despachos pendientes hoy</Text>
+      <FadeIn>
+        {/* Resumen del día */}
+        <View style={tc.summaryRow}>
+          <View style={[tc.summaryCard, { backgroundColor: T.warningFaint }]}>
+            <Ionicons name="time-outline" size={18} color={HEADER} />
+            <Text style={tc.summaryValue}>{porPreparar.length}</Text>
+            <Text style={tc.summaryLabel}>Por preparar</Text>
+          </View>
+          <View style={[tc.summaryCard, { backgroundColor: T.primaryFaint }]}>
+            <Ionicons name="bag-check-outline" size={18} color={HEADER} />
+            <Text style={tc.summaryValue}>{listos.length}</Text>
+            <Text style={tc.summaryLabel}>Listos</Text>
+          </View>
+          <View style={[tc.summaryCard, { backgroundColor: T.successFaint }]}>
+            <Ionicons name="checkmark-circle-outline" size={18} color={T.success} />
+            <Text style={[tc.summaryValue, { color: T.success }]}>{retiradosHoy.length}</Text>
+            <Text style={tc.summaryLabel}>Retirados hoy</Text>
+          </View>
         </View>
-      )}
-      <View style={{ height: 32 }} />
+
+        {porPreparar.length > 0 && (
+          <>
+            <Text style={tc.groupLabel}>Por preparar</Text>
+            {porPreparar.map(t => (
+              <TicketCard key={t.id} ticket={t} onListo={() => handleListo(t)} />
+            ))}
+          </>
+        )}
+        {listos.length > 0 && (
+          <>
+            <Text style={[tc.groupLabel, { marginTop: 6 }]}>Listos para retirar</Text>
+            {listos.map(t => <TicketCard key={t.id} ticket={t} />)}
+          </>
+        )}
+        {retiradosHoy.length > 0 && (
+          <>
+            <Text style={[tc.groupLabel, { color: T.textFaint, marginTop: 6 }]}>Retirados hoy</Text>
+            {retiradosHoy.map(t => <TicketCard key={t.id} ticket={t} />)}
+          </>
+        )}
+        {loaded && porPreparar.length === 0 && listos.length === 0 && retiradosHoy.length === 0 && (
+          <View style={tc.emptyBox}>
+            <Ionicons name="checkmark-circle-outline" size={48} color={T.success} />
+            <Text style={tc.emptyText}>Sin despachos pendientes hoy</Text>
+          </View>
+        )}
+        <View style={{ height: 32 }} />
+      </FadeIn>
     </ScrollView>
   );
 }
 
-const tc = StyleSheet.create({
+const makeTcStyles = (T: ThemeColors) => StyleSheet.create({
   scroll:    { padding: 16 },
-  groupLabel:{ fontSize: 14, fontWeight: '700', color: '#333', marginBottom: 10 },
+  summaryRow:  { flexDirection: 'row', gap: 12, marginBottom: 18 },
+  summaryCard: { flex: 1, borderRadius: 16, padding: 14, alignItems: 'center', gap: 4 },
+  summaryValue:{ fontSize: 22, fontWeight: '900', color: HEADER },
+  summaryLabel:{ fontSize: 11.5, fontWeight: '600', color: T.textSoft },
+  groupLabel:{ fontSize: 13, fontWeight: '700', color: T.text, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
   card: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 12,
-    shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 6, elevation: 2,
+    backgroundColor: T.surface, borderRadius: 18, padding: 16, marginBottom: 12,
+    ...cardShadow(T, HEADER),
   },
-  cardDone:  { opacity: 0.65 },
+  cardDone:  { opacity: 0.6 },
   cardTop:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cocheroRow:    { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  cocheroIconBox:{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#FDF0EB', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  cocheroName:   { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
-  cocheroLabel:{ fontSize: 11, color: '#888', marginTop: 1 },
-  statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  badgePending:{ backgroundColor: '#FFF3CD' },
-  badgeDone:   { backgroundColor: '#D4EDDA' },
-  statusBadgeText: { fontSize: 12, fontWeight: '700', color: '#333' },
-  divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 10 },
-  orderIdLabel:{ fontSize: 11, fontWeight: '600', color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
-  itemDot: { fontSize: 18, color: HEADER2, marginRight: 6, lineHeight: 20 },
-  itemText:{ fontSize: 14, color: '#444', flex: 1 },
-  itemQty: { fontWeight: '700', color: '#1A1A1A' },
+  cocheroIconBox:{ width: 42, height: 42, borderRadius: 21, backgroundColor: T.primaryFaint, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  cocheroName:   { fontSize: 15, fontWeight: '700', color: T.text },
+  cocheroLabel:{ fontSize: 11, color: T.textFaint, marginTop: 1 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, marginLeft: 8 },
+  badgePending:{ backgroundColor: T.warningFaint },
+  badgeDone:   { backgroundColor: T.successFaint },
+  statusBadgeText: { fontSize: 11.5, fontWeight: '700' },
+  divider: { height: 1, backgroundColor: T.border, marginVertical: 12 },
+  orderIdLabel:{ fontSize: 11, fontWeight: '700', color: T.textFaint, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
+  itemsBox: { gap: 7 },
+  itemRow: { flexDirection: 'row', alignItems: 'center' },
+  itemDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: HEADER2, marginRight: 9 },
+  itemText:{ fontSize: 14, color: T.textSoft, flex: 1 },
+  itemQty: { fontSize: 13, fontWeight: '700', color: T.text },
   cardBottom:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  subtotalText:  { fontSize: 13, color: '#555' },
-  subtotalAmount:{ fontWeight: '800', color: '#1A1A1A', fontSize: 15 },
+  subtotalLabel: { fontSize: 11, color: T.textFaint, marginBottom: 1 },
+  subtotalAmount:{ fontWeight: '800', color: T.text, fontSize: 17 },
   confirmBtn: {
-    backgroundColor: HEADER, borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: HEADER, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 10,
   },
   confirmBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   emptyBox:  { alignItems: 'center', paddingTop: 60 },
-  emptyText: { fontSize: 16, color: '#888', textAlign: 'center', marginTop: 12 },
+  emptyText: { fontSize: 16, color: T.textFaint, textAlign: 'center', marginTop: 12 },
 });
 
-// ─── Tab: Ventas ──────────────────────────────────────────────────────────────
+// ─── Estilos compartidos por GananciasTabC ────────────────────────────────────
 
-function VentasTab() {
-  const { weeklySales } = useComercianteStore();
-  const totalOrders = weeklySales.reduce((s, d) => s + d.orders, 0);
-  const totalAmount = weeklySales.reduce((s, d) => s + d.amount, 0);
-  const maxAmount   = Math.max(...weeklySales.map(d => d.amount));
-
-  return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={vc.scroll} showsVerticalScrollIndicator={false}>
-      {/* Resumen semanal */}
-      <View style={vc.summaryRow}>
-        <View style={[vc.summaryCard, { backgroundColor: '#FFF3E0' }]}>
-          <Text style={vc.summaryValue}>${totalAmount.toFixed(2)}</Text>
-          <Text style={vc.summaryLabel}>Ventas semana</Text>
-        </View>
-        <View style={[vc.summaryCard, { backgroundColor: '#E8F5E9' }]}>
-          <Text style={[vc.summaryValue, { color: '#1B5E20' }]}>{totalOrders}</Text>
-          <Text style={vc.summaryLabel}>Pedidos</Text>
-        </View>
-      </View>
-
-      <Text style={vc.sectionTitle}>Desglose diario</Text>
-
-      {weeklySales.map((day, i) => {
-        const barWidth = maxAmount > 0 ? (day.amount / maxAmount) * 100 : 0;
-        const isToday  = i === weeklySales.length - 1;
-        return (
-          <View key={i} style={vc.dayRow}>
-            <View style={vc.dayLeft}>
-              <Text style={[vc.dayName, isToday && { color: HEADER }]}>{day.dayLabel}</Text>
-              <Text style={vc.dayDate}>{day.shortDate}</Text>
-            </View>
-            <View style={vc.barContainer}>
-              <View style={[vc.barFill, { width: `${barWidth}%`, backgroundColor: isToday ? HEADER : HEADER2 }]} />
-            </View>
-            <View style={vc.dayRight}>
-              <Text style={vc.dayAmount}>${day.amount.toFixed(2)}</Text>
-              <Text style={vc.dayOrders}>{day.orders} ped.</Text>
-            </View>
-          </View>
-        );
-      })}
-      <View style={{ height: 32 }} />
-    </ScrollView>
-  );
-}
-
-const vc = StyleSheet.create({
+const makeVcStyles = (T: ThemeColors) => StyleSheet.create({
   scroll: { padding: 16 },
   summaryRow:  { flexDirection: 'row', gap: 12, marginBottom: 20 },
   summaryCard: { flex: 1, borderRadius: 14, padding: 16, alignItems: 'center' },
-  summaryValue:{ fontSize: 22, fontWeight: '900', color: '#C4623A' },
-  summaryLabel:{ fontSize: 12, color: '#666', marginTop: 4 },
-  sectionTitle:{ fontSize: 14, fontWeight: '800', color: '#333', marginBottom: 12 },
+  summaryValue:{ fontSize: 22, fontWeight: '900', color: HEADER },
+  summaryLabel:{ fontSize: 12, color: T.textSoft, marginTop: 4 },
+  sectionTitle:{ fontSize: 14, fontWeight: '800', color: T.text, marginBottom: 12 },
   dayRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12,
-    marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+    backgroundColor: T.surface, borderRadius: 14, padding: 12,
+    marginBottom: 8, borderWidth: 1, borderColor: 'transparent',
+    ...cardShadow(T, HEADER),
   },
-  dayLeft:    { width: 80 },
-  dayName:    { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
-  dayDate:    { fontSize: 11, color: '#888', marginTop: 1 },
-  barContainer:{ flex: 1, height: 8, backgroundColor: '#F0EBE8', borderRadius: 4, marginHorizontal: 10, overflow: 'hidden' },
+  dayRowToday: { borderColor: HEADER },
+  dayLeft:    { width: 92 },
+  dayName:    { fontSize: 14, fontWeight: '700', color: T.text },
+  dayDate:    { fontSize: 11, color: T.textFaint, marginTop: 1 },
+  todayChip: { backgroundColor: HEADER, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1.5 },
+  todayChipText: { fontSize: 9, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.3 },
+  barContainer:{ flex: 1, height: 8, backgroundColor: T.primaryFaint, borderRadius: 4, marginHorizontal: 10, overflow: 'hidden' },
   barFill:     { height: '100%', borderRadius: 4 },
   dayRight:   { width: 72, alignItems: 'flex-end' },
-  dayAmount:  { fontSize: 14, fontWeight: '800', color: '#1A1A1A' },
-  dayOrders:  { fontSize: 11, color: '#888', marginTop: 1 },
+  dayAmount:  { fontSize: 14, fontWeight: '800', color: T.text },
+  dayOrders:  { fontSize: 11, color: T.textFaint, marginTop: 1 },
 });
 
-// ─── Tab: Saldo ───────────────────────────────────────────────────────────────
-
-function SaldoTab() {
-  const { fridayBalance, fridayDate, weeklySales } = useComercianteStore();
-  const fridayLabel = formatShortDate(fridayDate);
-  const totalOrders = weeklySales.reduce((s, d) => s + d.orders, 0);
-
-  return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={sc.scroll} showsVerticalScrollIndicator={false}>
-
-      {/* Tarjeta principal de saldo */}
-      <View style={sc.balanceCard}>
-        <Text style={sc.balanceTitle}>Saldo a cobrar el viernes</Text>
-        <Text style={sc.balanceDate}>{fridayLabel}</Text>
-        <Text style={sc.balanceAmount}>${fridayBalance.toFixed(2)}</Text>
-        <View style={sc.balanceMeta}>
-          <Ionicons name="cube-outline" size={14} color="rgba(255,255,255,0.80)" />
-          <Text style={sc.balanceMetaText}> {totalOrders} pedidos esta semana</Text>
-        </View>
-        <View style={sc.infoPill}>
-          <Ionicons name="information-circle-outline" size={14} color="#FFFFFF" />
-          <Text style={sc.infoPillText}> HiGo deposita todos los viernes antes de las 18:00</Text>
-        </View>
-      </View>
-
-      {/* Desglose por día */}
-      <Text style={sc.sectionTitle}>Ventas de la semana</Text>
-      {weeklySales.map((day, i) => (
-        <View key={i} style={sc.dayCard}>
-          <View style={sc.dayCardLeft}>
-            <Text style={sc.dayCardDay}>{day.dayLabel}</Text>
-            <Text style={sc.dayCardDate}>{day.shortDate}</Text>
-          </View>
-          <View style={sc.dayCardRight}>
-            <Text style={sc.dayCardAmount}>${day.amount.toFixed(2)}</Text>
-            <Text style={sc.dayCardOrders}>{day.orders} pedidos</Text>
-          </View>
-        </View>
-      ))}
-
-      {/* Total */}
-      <View style={sc.totalCard}>
-        <Text style={sc.totalLabel}>Total semana</Text>
-        <Text style={sc.totalAmount}>${fridayBalance.toFixed(2)}</Text>
-      </View>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
-  );
-}
-
-const sc = StyleSheet.create({
+const makeScStyles = (T: ThemeColors) => StyleSheet.create({
   scroll: { padding: 16 },
   balanceCard: {
-    backgroundColor: HEADER, borderRadius: 20, padding: 24,
-    alignItems: 'center', marginBottom: 24,
-    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12, elevation: 5,
+    borderRadius: 22, padding: 24,
+    alignItems: 'center', marginBottom: 24, overflow: 'hidden',
+    ...floatingShadow(T, HEADER),
+  },
+  balanceBlob: {
+    position: 'absolute', top: -60, right: -50,
+    width: 160, height: 160, borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  balanceIconBadge: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 10,
   },
   balanceTitle:  { fontSize: 14, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
   balanceDate:   { fontSize: 13, color: 'rgba(255,255,255,0.70)', marginTop: 2, marginBottom: 10 },
@@ -290,31 +319,15 @@ const sc = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
   },
   infoPillText: { fontSize: 12, color: '#FFFFFF' },
-  sectionTitle:  { fontSize: 14, fontWeight: '800', color: '#333', marginBottom: 10 },
-  dayCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 12,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: 14, marginBottom: 8,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
-  },
-  dayCardLeft:   {},
-  dayCardDay:    { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
-  dayCardDate:   { fontSize: 11, color: '#888', marginTop: 1 },
-  dayCardRight:  { alignItems: 'flex-end' },
-  dayCardAmount: { fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
-  dayCardOrders: { fontSize: 11, color: '#888', marginTop: 1 },
-  totalCard: {
-    backgroundColor: '#FFF3E0', borderRadius: 14,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: 16, marginTop: 8,
-  },
-  totalLabel:  { fontSize: 15, fontWeight: '700', color: '#333' },
-  totalAmount: { fontSize: 22, fontWeight: '900', color: HEADER },
+  sectionTitle:  { fontSize: 14, fontWeight: '800', color: T.text, marginBottom: 10 },
 });
 
 // ─── Tab: Ganancias (combinado Ventas + Saldo) ────────────────────────────────
 
 function GananciasTabC() {
+  const T = useThemeColors();
+  const vc = makeVcStyles(T);
+  const sc = makeScStyles(T);
   const { fridayBalance, fridayDate, weeklySales } = useComercianteStore();
   const totalOrders = weeklySales.reduce((s, d) => s + d.orders, 0);
   const totalAmount = weeklySales.reduce((s, d) => s + d.amount, 0);
@@ -323,9 +336,14 @@ function GananciasTabC() {
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 14 }} showsVerticalScrollIndicator={false}>
+      <FadeIn>
 
       {/* Saldo a cobrar */}
-      <View style={sc.balanceCard}>
+      <LinearGradient colors={[HEADER, HEADER2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={sc.balanceCard}>
+        <View style={sc.balanceBlob} pointerEvents="none" />
+        <View style={sc.balanceIconBadge}>
+          <Ionicons name="wallet-outline" size={22} color="#FFFFFF" />
+        </View>
         <Text style={sc.balanceTitle}>Saldo a cobrar el viernes</Text>
         <Text style={sc.balanceDate}>{fridayLabel}</Text>
         <Text style={sc.balanceAmount}>${fridayBalance.toFixed(2)}</Text>
@@ -337,15 +355,15 @@ function GananciasTabC() {
           <Ionicons name="information-circle-outline" size={14} color="#FFFFFF" />
           <Text style={sc.infoPillText}> HiGo deposita todos los viernes antes de las 18:00</Text>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Resumen semanal */}
       <View style={vc.summaryRow}>
-        <View style={[vc.summaryCard, { backgroundColor: '#FFF3E0' }]}>
+        <View style={[vc.summaryCard, { backgroundColor: T.warningFaint }]}>
           <Text style={vc.summaryValue}>${totalAmount.toFixed(2)}</Text>
           <Text style={vc.summaryLabel}>Ventas semana</Text>
         </View>
-        <View style={[vc.summaryCard, { backgroundColor: '#E8F5E9' }]}>
+        <View style={[vc.summaryCard, { backgroundColor: T.successFaint }]}>
           <Text style={[vc.summaryValue, { color: '#1B5E20' }]}>{totalOrders}</Text>
           <Text style={vc.summaryLabel}>Pedidos</Text>
         </View>
@@ -355,11 +373,18 @@ function GananciasTabC() {
       <Text style={vc.sectionTitle}>Desglose diario</Text>
       {weeklySales.map((day, i) => {
         const barW  = maxAmount > 0 ? (day.amount / maxAmount) * 100 : 0;
-        const isHoy = i === weeklySales.length - 1;
+        const isHoy = isToday(day.date);
         return (
-          <View key={i} style={vc.dayRow}>
+          <View key={i} style={[vc.dayRow, isHoy && vc.dayRowToday]}>
             <View style={vc.dayLeft}>
-              <Text style={[vc.dayName, isHoy && { color: HEADER }]}>{day.dayLabel}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[vc.dayName, isHoy && { color: HEADER }]}>{day.dayLabel}</Text>
+                {isHoy && (
+                  <View style={vc.todayChip}>
+                    <Text style={vc.todayChipText}>HOY</Text>
+                  </View>
+                )}
+              </View>
               <Text style={vc.dayDate}>{day.shortDate}</Text>
             </View>
             <View style={vc.barContainer}>
@@ -373,6 +398,7 @@ function GananciasTabC() {
         );
       })}
       <View style={{ height: 32 }} />
+      </FadeIn>
     </ScrollView>
   );
 }
@@ -384,70 +410,240 @@ function PerfilTabC({
 }: {
   onLogout: () => void; merchantName: string; merchantStall: string;
 }) {
+  const T = useThemeColors();
+  const pf = makePfStyles(T);
   const user = useAuthStore((s) => s.user);
+  const updatePhoto = useAuthStore((s) => s.updatePhoto);
+  const [showChangePhone, setShowChangePhone] = useState(false);
+  // Se prioriza lo que el comerciante puso de verdad en su solicitud — el
+  // texto fijo solo queda como respaldo si esos datos no llegaron a existir.
+  const stallDisplay = user?.stallNumber
+    ? `Puesto #${user?.stallNumber}${user?.giro ? ` · ${user.giro}` : ''}`
+    : merchantStall;
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 14 }} showsVerticalScrollIndicator={false}>
-      <View style={pf.wrapper}>
-        <View style={pf.avatar}>
-          <Text style={{ fontSize: 32, fontWeight: '800', color: HEADER }}>
-            {user?.name?.[0]?.toUpperCase() ?? 'C'}
-          </Text>
-        </View>
-        <Text style={pf.name}>{user?.name ?? merchantName}</Text>
+      <FadeIn style={{ gap: 14 }}>
+      <View style={pf.profileCard}>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => pickAvatarPhoto(updatePhoto)}>
+          <View style={pf.avatarRing}>
+            <Avatar name={user?.name ?? merchantName} photoUri={user?.photoUri} size={80} bg={T.primaryFaint} textColor={HEADER} />
+            <View style={pf.avatarEditBadge}>
+              <Ionicons name="camera" size={14} color="#FFFFFF" />
+            </View>
+          </View>
+        </TouchableOpacity>
+        <Text style={pf.name} numberOfLines={1}>{user ? shortName(user) : merchantName}</Text>
         <View style={pf.rolePill}>
-          <Text style={pf.roleText}>Comerciante</Text>
+          <Ionicons name="storefront" size={12} color={HEADER} />
+          <Text style={pf.roleText}> Comerciante</Text>
         </View>
       </View>
 
+      <Text style={pf.sectionLabel}>Información</Text>
       <View style={pf.card}>
-        <PerfilRowC icon="storefront-outline"       label="Puesto"    value={merchantStall} />
+        <PerfilRowC icon="storefront-outline"       label="Puesto"    value={stallDisplay} />
         <View style={pf.divider} />
-        <PerfilRowC icon="call-outline"             label="Teléfono"  value={(user as any)?.phone ?? '—'} />
+        <PerfilRowC
+          icon="call-outline"
+          label="Teléfono"
+          value={user?.phone ?? '—'}
+          onPress={() => setShowChangePhone(true)}
+        />
         <View style={pf.divider} />
-        <PerfilRowC icon="card-outline"             label="Cédula"    value={(user as any)?.cedula ?? '—'} />
+        <PerfilRowC icon="card-outline"             label="Cédula"    value={user?.cedula ?? '—'} />
         <View style={pf.divider} />
-        <PerfilRowC icon="shield-checkmark-outline" label="Estado"    value="Verificado" valueColor="#27AE60" />
+        <PerfilRowC icon="shield-checkmark-outline" label="Estado"    value="Verificado" valueColor={T.success} />
       </View>
+
+      <Text style={pf.sectionLabel}>Apariencia</Text>
+      <AppearanceSelector accentColor={HEADER} />
 
       <TouchableOpacity style={pf.logoutBtn} activeOpacity={0.85} onPress={onLogout}>
         <Ionicons name="log-out-outline" size={18} color="#E74C3C" />
         <Text style={pf.logoutText}>Cerrar sesión</Text>
       </TouchableOpacity>
       <View style={{ height: 16 }} />
+      </FadeIn>
+      {showChangePhone && (
+        <ChangePhoneModal currentPhone={user?.phone ?? ''} onClose={() => setShowChangePhone(false)} />
+      )}
     </ScrollView>
   );
 }
 
 function PerfilRowC({
-  icon, label, value, valueColor,
+  icon, label, value, valueColor, onPress,
 }: {
-  icon: keyof typeof Ionicons.glyphMap; label: string; value: string; valueColor?: string;
+  icon: keyof typeof Ionicons.glyphMap; label: string; value: string; valueColor?: string; onPress?: () => void;
 }) {
-  return (
-    <View style={pf.row}>
+  const T = useThemeColors();
+  const pf = makePfStyles(T);
+  const content = (
+    <>
       <View style={pf.rowIcon}>
         <Ionicons name={icon} size={18} color={HEADER} />
       </View>
       <Text style={pf.rowLabel}>{label}</Text>
       <Text style={[pf.rowValue, valueColor ? { color: valueColor } : null]}>{value}</Text>
-    </View>
+      {onPress && <Ionicons name="chevron-forward" size={16} color={T.textFaint} style={{ marginLeft: 4 }} />}
+    </>
+  );
+  if (onPress) {
+    return (
+      <TouchableOpacity style={pf.row} activeOpacity={0.7} onPress={onPress}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+  return <View style={pf.row}>{content}</View>;
+}
+
+// ─── Modal: cambiar teléfono ────────────────────────────────────────────────
+// Sin verificación por SMS todavía (requeriría activar Firebase Phone Auth,
+// con costo por mensaje) — se protege pidiendo la contraseña actual, mismo
+// resguardo que ya se usa para cambiar correo/contraseña.
+
+function ChangePhoneModal({ currentPhone, onClose }: { currentPhone: string; onClose: () => void }) {
+  const T = useThemeColors();
+  const pf = makePfStyles(T);
+  const changePhone = useAuthStore((s) => s.changePhone);
+  const [newPhone, setNewPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    const trimmed = newPhone.trim();
+    if (!trimmed || !password) {
+      Alert.alert('Faltan datos', 'Ingresá el nuevo teléfono y tu contraseña actual.');
+      return;
+    }
+    if (trimmed === currentPhone) {
+      Alert.alert('Teléfono igual', 'Ese ya es tu teléfono actual.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await changePhone(trimmed, password);
+      Alert.alert('Teléfono actualizado', 'Tu número de contacto se actualizó correctamente.');
+      onClose();
+    } catch (error: any) {
+      const code = error?.code as string | undefined;
+      const message =
+        code === 'auth/wrong-password' || code === 'auth/invalid-credential'
+          ? 'La contraseña actual no es correcta.'
+          : 'No se pudo actualizar el teléfono. Intentá de nuevo.';
+      Alert.alert('Error', message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={pf.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={pf.modalCard}>
+          <View style={pf.modalHeader}>
+            <Text style={pf.modalTitle}>Cambiar teléfono</Text>
+            <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
+              <Ionicons name="close" size={22} color={T.textFaint} />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={pf.modalHelper}>Teléfono actual: {currentPhone || '—'}</Text>
+
+          <Text style={pf.modalLabel}>Nuevo teléfono</Text>
+          <TextInput
+            style={pf.modalInput}
+            value={newPhone}
+            onChangeText={setNewPhone}
+            placeholder="09XXXXXXXX"
+            placeholderTextColor={T.textFaint}
+            keyboardType="phone-pad"
+          />
+
+          <Text style={pf.modalLabel}>Contraseña actual</Text>
+          <View style={pf.modalPasswordWrapper}>
+            <TextInput
+              style={pf.modalPasswordInput}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Tu contraseña actual"
+              placeholderTextColor={T.textFaint}
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity style={pf.modalEyeBtn} activeOpacity={0.7} onPress={() => setShowPassword((v) => !v)}>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={T.textFaint} />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[pf.modalSaveBtn, saving && { opacity: 0.6 }]}
+            activeOpacity={0.85}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            <Text style={pf.modalSaveBtnText}>{saving ? 'Guardando…' : 'Guardar'}</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
-const pf = StyleSheet.create({
-  wrapper:   { alignItems: 'center', gap: 8, paddingVertical: 8 },
-  avatar:    { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FDF0EB', borderWidth: 3, borderColor: '#F0C0A0', alignItems: 'center', justifyContent: 'center' },
-  name:      { fontSize: 22, fontWeight: '800', color: '#1A1A1A' },
-  rolePill:  { backgroundColor: '#FDF0EB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 4, borderWidth: 1, borderColor: '#F0C0A0' },
+const makePfStyles = (T: ThemeColors) => StyleSheet.create({
+  profileCard: {
+    alignItems: 'center', gap: 8, paddingVertical: 22,
+    backgroundColor: T.surface, borderRadius: 20,
+    ...cardShadow(T, HEADER),
+  },
+  avatarRing: {
+    position: 'relative', padding: 4, borderRadius: 46,
+    borderWidth: 2, borderColor: T.primaryFaint,
+  },
+  avatarEditBadge: {
+    position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: 13,
+    backgroundColor: HEADER, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: T.surface,
+  },
+  name:      { fontSize: 20, fontWeight: '800', color: T.text, marginTop: 4 },
+  rolePill:  { flexDirection: 'row', alignItems: 'center', backgroundColor: T.primaryFaint, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 5, borderWidth: 1, borderColor: T.border },
   roleText:  { fontSize: 13, fontWeight: '700', color: HEADER },
-  card:      { backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 4, borderWidth: 1.5, borderColor: '#F0C0A0', overflow: 'hidden' },
-  divider:   { height: 1, backgroundColor: '#F0F0F0' },
+  card:      { backgroundColor: T.surface, borderRadius: 16, paddingHorizontal: 4, borderWidth: 1.5, borderColor: T.border, overflow: 'hidden' },
+  divider:   { height: 1, backgroundColor: T.border },
   row:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
-  rowIcon:   { width: 36, height: 36, borderRadius: 10, backgroundColor: '#FDF0EB', alignItems: 'center', justifyContent: 'center' },
-  rowLabel:  { flex: 1, fontSize: 14, color: '#888' },
-  rowValue:  { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: '#FADADD', borderRadius: 14, paddingVertical: 14, backgroundColor: '#FFF5F5', marginTop: 4 },
+  rowIcon:   { width: 36, height: 36, borderRadius: 10, backgroundColor: T.primaryFaint, alignItems: 'center', justifyContent: 'center' },
+  rowLabel:  { flex: 1, fontSize: 14, color: T.textFaint },
+  rowValue:  { fontSize: 14, fontWeight: '700', color: T.text },
+
+  sectionLabel: { fontSize: 13, fontWeight: '700', color: T.textFaint, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 2 },
+
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: T.dangerFaint, borderRadius: 14, paddingVertical: 14, backgroundColor: T.dangerFaint, marginTop: 4 },
   logoutText:{ fontSize: 15, fontWeight: '700', color: '#E74C3C' },
+
+  // Modal: cambiar teléfono
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(10,10,30,0.55)', justifyContent: 'flex-end' },
+  modalCard: {
+    backgroundColor: T.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, paddingBottom: 36,
+  },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  modalTitle: { fontSize: 17, fontWeight: '800', color: T.text },
+  modalHelper: { fontSize: 13, color: T.textSoft, marginBottom: 4 },
+  modalLabel: { fontSize: 12, fontWeight: '700', color: T.textSoft, marginBottom: 6, marginTop: 14, textTransform: 'uppercase', letterSpacing: 0.4 },
+  modalInput: {
+    backgroundColor: T.background, borderRadius: 10, borderWidth: 1.5, borderColor: T.border,
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: T.text,
+  },
+  modalPasswordWrapper: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: T.background, borderRadius: 10, borderWidth: 1.5, borderColor: T.border,
+    paddingHorizontal: 14,
+  },
+  modalPasswordInput: { flex: 1, paddingVertical: 12, fontSize: 14, color: T.text },
+  modalEyeBtn: { paddingLeft: 10, paddingVertical: 6 },
+  modalSaveBtn: { marginTop: 24, backgroundColor: HEADER, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  modalSaveBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });
 
 // ─── Bottom Tab Bar ───────────────────────────────────────────────────────────
@@ -457,11 +653,13 @@ function TabBarItem({
 }: {
   icon: keyof typeof Ionicons.glyphMap; label: string; active: boolean; badge?: number; onPress: () => void;
 }) {
+  const T = useThemeColors();
+  const tb = makeTbStyles(T);
   const activeIcon = icon.replace('-outline', '') as keyof typeof Ionicons.glyphMap;
   return (
     <TouchableOpacity style={tb.item} activeOpacity={0.7} onPress={onPress}>
       <View style={tb.iconWrapper}>
-        <Ionicons name={active ? activeIcon : icon} size={24} color={active ? HEADER : '#9B9B9B'} />
+        <Ionicons name={active ? activeIcon : icon} size={24} color={active ? HEADER : T.textFaint} />
         {badge > 0 && (
           <View style={tb.badge}>
             <Text style={tb.badgeText}>{badge}</Text>
@@ -473,22 +671,25 @@ function TabBarItem({
   );
 }
 
-const tb = StyleSheet.create({
+const makeTbStyles = (T: ThemeColors) => StyleSheet.create({
   item:        { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 6 },
   iconWrapper: { position: 'relative' },
   badge:       { position: 'absolute', top: -4, right: -8, backgroundColor: '#E74C3C', borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   badgeText:   { fontSize: 10, fontWeight: '800', color: '#FFFFFF' },
-  label:       { fontSize: 11, fontWeight: '600', color: '#9B9B9B' },
+  label:       { fontSize: 11, fontWeight: '600', color: T.textFaint },
 });
 
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 
 export default function ComercianteDashboardScreen({ navigation }: Props) {
+  const T = useThemeColors();
+  const styles = makeStyles(T);
   const [activeTab, setActiveTab]     = useState<Tab>('pedidos');
-  const [disponible, setDisponible]   = useState(true);
   const user = useAuthStore((s) => s.user);
-  const { merchantName, merchantStall, dispatchTickets } = useComercianteStore();
+  const { dispatchTickets, disponible, toggleDisponible } = useComercianteStore();
   const pendienteCount = dispatchTickets.filter(t => t.status === 'pendiente').length;
+  const merchantName  = user?.name ?? 'Comerciante';
+  const merchantStall = user?.stallNumber ? `Puesto #${user.stallNumber}` : 'Puesto sin asignar';
 
   function handleLogout() {
     Alert.alert('Cerrar sesión', '¿Seguro que querés salir?', [
@@ -505,39 +706,47 @@ export default function ComercianteDashboardScreen({ navigation }: Props) {
       <StatusBar barStyle="light-content" />
 
       {/* ── Header ── */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarCircle}>
-            <Text style={{ fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.9)' }}>
-              {user?.name?.[0]?.toUpperCase() ?? 'C'}
+      <LinearGradient colors={[HEADER, HEADER2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <View style={styles.headerBlob} pointerEvents="none" />
+        <View style={styles.headerRing} pointerEvents="none" />
+        <FadeIn style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            <View style={styles.headerAvatarRing}>
+              <Avatar name={user?.name ?? merchantName} photoUri={user?.photoUri} size={46} />
+            </View>
+            <View style={{ flexShrink: 1 }}>
+              <View style={styles.headerGreetingRow}>
+                <Ionicons name="storefront" size={11} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.headerGreeting}>Hola,</Text>
+              </View>
+              <Text style={styles.headerName} numberOfLines={1}>{user ? shortName(user) : merchantName}</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.disponibleBadge, !disponible && styles.noDisponibleBadge]}
+            activeOpacity={0.8}
+            onPress={toggleDisponible}
+          >
+            <View style={[styles.disponibleDot, !disponible && styles.noDisponibleDot]} />
+            <Text style={[styles.disponibleText, !disponible && styles.noDisponibleText]}>
+              {disponible ? 'Disponible' : 'No disponible'}
             </Text>
-          </View>
-          <View>
-            <Text style={styles.headerGreeting}>Hola,</Text>
-            <Text style={styles.headerName}>{merchantName}</Text>
-          </View>
-        </View>
-        <TouchableOpacity
-          style={[styles.disponibleBadge, !disponible && styles.noDisponibleBadge]}
-          activeOpacity={0.8}
-          onPress={() => setDisponible(!disponible)}
-        >
-          <View style={[styles.disponibleDot, !disponible && styles.noDisponibleDot]} />
-          <Text style={[styles.disponibleText, !disponible && styles.noDisponibleText]}>
-            {disponible ? 'Disponible' : 'No disponible'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          </TouchableOpacity>
+        </FadeIn>
 
-      {/* Alert banner de pedidos pendientes */}
-      {pendienteCount > 0 && activeTab === 'pedidos' && (
-        <View style={styles.alertBanner}>
-          <Ionicons name="cube-outline" size={14} color="#FFFFFF" />
-          <Text style={styles.alertBannerText}>
-            {' '}{pendienteCount} despacho{pendienteCount > 1 ? 's' : ''} pendiente{pendienteCount > 1 ? 's' : ''} hoy
-          </Text>
-        </View>
-      )}
+        {/* Tarjeta flotante de pedidos pendientes, superpuesta al borde del header */}
+        {pendienteCount > 0 && activeTab === 'pedidos' && (
+          <View style={styles.floatingAlert}>
+            <View style={styles.floatingAlertIcon}>
+              <Ionicons name="cube-outline" size={16} color={HEADER} />
+            </View>
+            <Text style={styles.floatingAlertText}>
+              {pendienteCount} pedido{pendienteCount > 1 ? 's' : ''} por preparar
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
+          </View>
+        )}
+      </LinearGradient>
 
       {/* ── Contenido ── */}
       <View style={styles.body}>
@@ -580,33 +789,62 @@ export default function ComercianteDashboardScreen({ navigation }: Props) {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+const makeStyles = (T: ThemeColors) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T.background },
 
   header: {
-    backgroundColor: HEADER,
     paddingTop: 52,
     paddingHorizontal: 18,
-    paddingBottom: 18,
+    paddingBottom: 22,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+  },
+  headerBlob: {
+    position: 'absolute', top: -70, right: -50,
+    width: 190, height: 190, borderRadius: 95,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  headerRing: {
+    position: 'absolute', bottom: -34, left: -30,
+    width: 110, height: 110, borderRadius: 55,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 10,
   },
-  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatarCircle:   { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 },
+  headerAvatarRing: {
+    padding: 2.5, borderRadius: 26,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
+  },
+  headerGreetingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerGreeting: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
   headerName:     { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
 
-  disponibleBadge:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(46,204,113,0.2)', borderWidth: 1, borderColor: 'rgba(46,204,113,0.5)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
+  disponibleBadge:   { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(46,204,113,0.2)', borderWidth: 1, borderColor: 'rgba(46,204,113,0.5)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
   noDisponibleBadge: { backgroundColor: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.3)' },
   disponibleDot:     { width: 8, height: 8, borderRadius: 4, backgroundColor: '#2ECC71' },
   noDisponibleDot:   { backgroundColor: 'rgba(255,255,255,0.5)' },
   disponibleText:    { fontSize: 13, fontWeight: '700', color: '#2ECC71' },
   noDisponibleText:  { color: 'rgba(255,255,255,0.6)' },
 
-  alertBanner:     { backgroundColor: HEADER2, paddingHorizontal: 18, paddingVertical: 8, flexDirection: 'row', alignItems: 'center' },
-  alertBannerText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  floatingAlert: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12,
+    marginTop: 16,
+  },
+  floatingAlertIcon: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: T.primaryFaint,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  floatingAlertText: { flex: 1, fontSize: 13, fontWeight: '700', color: T.text },
 
-  body:   { flex: 1, backgroundColor: BG },
-  tabBar: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F0EBE8', paddingBottom: 4, paddingTop: 6 },
+  body:   { flex: 1, backgroundColor: T.background },
+  tabBar: { flexDirection: 'row', backgroundColor: T.surface, borderTopWidth: 1, borderTopColor: T.border, paddingBottom: 4, paddingTop: 6 },
 });

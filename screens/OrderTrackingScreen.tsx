@@ -1,26 +1,28 @@
 import {
+  useEffect,
+  useRef } from 'react';
+import {
   StyleSheet,
-  Text,
   View,
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
   Linking,
+  Animated,
+  Easing,
 } from 'react-native';
+import Text from '../components/Text';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { HomeStackParamList } from '../navigation/types';
+import { HomeStackParamList, RootStackParamList } from '../navigation/types';
+import { useOrdersStore, OrderStatus } from '../store/ordersStore';
+import { useThemeColors } from '../theme/useThemeColors';
+import { ThemeColors } from '../theme/colors';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
-
-export type OrderStatus =
-  | 'recibido'
-  | 'en_mercado'
-  | 'consolidado'
-  | 'en_camino'
-  | 'entregado';
 
 type Nav   = StackNavigationProp<HomeStackParamList, 'OrderTracking'>;
 type Route = RouteProp<HomeStackParamList, 'OrderTracking'>;
@@ -31,81 +33,131 @@ interface StatusStep {
   key: OrderStatus;
   label: string;
   sublabel: string;
-  color: string;
   icon: keyof typeof Ionicons.glyphMap;
 }
 
+// Ya no cada paso tiene su propio color suelto (antes era literalmente un
+// color distinto por estado — azul, naranja, otro azul, amarillo, verde, sin
+// ninguna relación entre sí). Ahora es un esquema de 3 colores consistente en
+// toda la línea de tiempo: gris = todavía no llega, morado = en curso ahora
+// mismo (con el pulso), verde = ya completado. Se ve como una progresión real,
+// no como un arcoíris.
 const STEPS: StatusStep[] = [
-  {
-    key: 'recibido',
-    label: 'Recibido',
-    sublabel: 'Tu pedido fue confirmado',
-    color: '#1565C0',
-    icon: 'checkmark-circle',
-  },
-  {
-    key: 'en_mercado',
-    label: 'En mercado',
-    sublabel: 'El cochero está recolectando',
-    color: '#E65100',
-    icon: 'storefront',
-  },
-  {
-    key: 'consolidado',
-    label: 'Consolidado',
-    sublabel: 'Productos listos para envío',
-    color: '#0277BD',
-    icon: 'cube',
-  },
-  {
-    key: 'en_camino',
-    label: 'En camino',
-    sublabel: 'Tu pedido va hacia ti',
-    color: '#F9A825',
-    icon: 'bicycle',
-  },
-  {
-    key: 'entregado',
-    label: 'Entregado',
-    sublabel: '¡Pedido entregado con éxito!',
-    color: '#2E7D32',
-    icon: 'home',
-  },
+  { key: 'recibido',    label: 'Recibido',    sublabel: 'Tu pedido fue confirmado',        icon: 'checkmark-circle' },
+  { key: 'en_mercado',  label: 'En mercado',  sublabel: 'El cochero recorre los puestos',  icon: 'storefront' },
+  { key: 'consolidado', label: 'Consolidado', sublabel: 'Productos listos para envío',     icon: 'cube' },
+  { key: 'en_camino',   label: 'En camino',   sublabel: 'Tu pedido va hacia ti',           icon: 'bicycle' },
+  { key: 'entregado',   label: 'Entregado',   sublabel: '¡Pedido entregado con éxito!',    icon: 'home' },
 ];
 
-const STATUS_INDEX: Record<OrderStatus, number> = {
-  recibido: 0,
-  en_mercado: 1,
-  consolidado: 2,
-  en_camino: 3,
-  entregado: 4,
-};
+// Solo pedidos viejos (operatorRole 'transportista'): entrega directa sin
+// paso por el mercado. Hoy todo pedido pasa por un cochero.
+const DIRECT_STEPS: StatusStep[] = STEPS.filter(
+  (s) => s.key !== 'en_mercado' && s.key !== 'consolidado'
+);
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function OrderTrackingScreen() {
+  const C = useThemeColors();
+  const styles = makeStyles(C);
   const navigation = useNavigation<Nav>();
+  const rootNavigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route      = useRoute<Route>();
+  const { orderId } = route.params;
+
+  const order = useOrdersStore((s) => s.orders.find((o) => o.id === orderId));
+
+  // El pedido avanza solo por acciones reales: el cochero lo reclama y
+  // consolida (store/cocheroTicketStore.ts), y el transportista lo pone en
+  // camino y confirma la entrega (store/transportistaDeliveryStore.ts).
+
+  // Halo que pulsa detrás del punto del paso actual en la línea de tiempo —
+  // para que se sienta "en curso" de verdad, no solo un color estático.
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.4, duration: 750, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1,   duration: 750, easing: Easing.in(Easing.ease),  useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  if (!order) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle={C.statusBarStyle} />
+        <View style={styles.notFoundContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#FFF" />
+          <Text style={styles.notFoundText}>No se encontró este pedido.</Text>
+          <TouchableOpacity style={styles.notFoundBtn} onPress={() => navigation.navigate('Home')}>
+            <Text style={styles.notFoundBtnText}>Volver al inicio</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const {
-    orderId,
     address,
     estimatedTime,
-    currentStatus,
-    operatorName,
-    operatorPhone,
     operatorRole,
     deliveryLat,
     deliveryLng,
-  } = route.params;
+  } = order;
+  const currentStatus: OrderStatus = order.status;
 
-  const currentIndex  = STATUS_INDEX[currentStatus];
-  const currentStep   = STEPS[currentIndex];
+  const steps        = operatorRole === 'transportista' ? DIRECT_STEPS : STEPS;
+  const currentIndex = Math.max(0, steps.findIndex((s) => s.key === currentStatus));
+  const currentStep  = steps[currentIndex];
   const isEnCamino    = currentStatus === 'en_camino';
   const isEntregado   = currentStatus === 'entregado';
+  const badgeColor    = isEntregado ? C.success : C.primary;
+
+  // Qué operativo mostrar: el cochero mientras el pedido está en el mercado o
+  // consolidándose; el transportista una vez que el pedido va en camino (o
+  // siempre, si es entrega directa y no pasa por el mercado).
+  const showTransportista = isEnCamino || isEntregado || operatorRole === 'transportista';
+  const op = {
+    role:  showTransportista ? 'Transportista' : 'Cochero',
+    icon:  (showTransportista ? 'car' : 'bicycle') as 'car' | 'bicycle',
+    name:  showTransportista ? order.transportistaName  : order.operatorName,
+    phone: showTransportista ? order.transportistaPhone : order.operatorPhone,
+    uid:   showTransportista ? order.transportistaUid   : order.operatorUid,
+    searching: showTransportista
+      ? 'Buscando transportista para tu pedido…'
+      : 'Buscando quién recoge tu pedido…',
+  };
+  const opUnassigned = !op.name;
+
+  // Aviso de pago: solo cuando hay algo que el cliente tenga que saber.
+  const payment =
+    order.paymentStatus === 'por_verificar' ? {
+      icon: 'time-outline' as const, color: C.warning,
+      text: 'Estamos verificando tu transferencia. Tu pedido empieza a prepararse apenas la confirmemos.',
+    } :
+    order.paymentStatus === 'rechazado' ? {
+      icon: 'alert-circle-outline' as const, color: C.danger,
+      text: 'No pudimos confirmar tu transferencia. Escribinos por el chat para resolverlo.',
+    } :
+    order.paymentStatus === 'contra_entrega' ? {
+      icon: 'cash-outline' as const, color: C.primary,
+      text: `Pagás ${order.total.toFixed(2)} en efectivo al recibir tu pedido.`,
+    } :
+    order.paymentStatus === 'verificado' ? {
+      icon: 'checkmark-circle-outline' as const, color: C.success,
+      text: 'Pago confirmado.',
+    } : null;
 
   function handleCall() {
-    Linking.openURL(`tel:${operatorPhone}`);
+    if (op.phone) Linking.openURL(`tel:${op.phone}`);
+  }
+
+  function handleMessage() {
+    rootNavigation.navigate('OrderChat', { orderId });
   }
 
   function handleMap() {
@@ -118,29 +170,41 @@ export default function OrderTrackingScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#3D1F8B" />
+      <StatusBar barStyle={C.statusBarStyle} />
 
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={C.headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Estado del pedido</Text>
-        <View style={{ width: 40 }} />
-      </View>
+        <TouchableOpacity
+          onPress={() => rootNavigation.navigate('Assistant')}
+          style={styles.backBtn}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={22} color="#FFF" />
+        </TouchableOpacity>
+      </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+        {payment && (
+          <View style={[styles.paymentBanner, { borderColor: payment.color }]}>
+            <Ionicons name={payment.icon} size={20} color={payment.color} />
+            <Text style={styles.paymentBannerText}>{payment.text}</Text>
+          </View>
+        )}
 
         {/* Tarjeta resumen */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
-            <Ionicons name="receipt-outline" size={18} color="#3D1F8B" />
+            <Ionicons name="receipt-outline" size={18} color={C.primary} />
             <Text style={styles.summaryLabel}>Pedido</Text>
             <Text style={styles.summaryValue}>#{orderId}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryRow}>
-            <Ionicons name="location-outline" size={18} color="#3D1F8B" />
+            <Ionicons name="location-outline" size={18} color={C.primary} />
             <Text style={styles.summaryLabel}>Entrega en</Text>
             <Text style={[styles.summaryValue, styles.summaryAddress]} numberOfLines={2}>
               {address}
@@ -148,36 +212,43 @@ export default function OrderTrackingScreen() {
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryRow}>
-            <Ionicons name="time-outline" size={18} color="#3D1F8B" />
+            <Ionicons name="time-outline" size={18} color={C.primary} />
             <Text style={styles.summaryLabel}>Hora estimada</Text>
             <Text style={styles.summaryValue}>{estimatedTime}</Text>
           </View>
         </View>
 
-        {/* Badge estado actual */}
-        <View style={[styles.statusBadge, { backgroundColor: currentStep.color + '18', borderColor: currentStep.color }]}>
-          <Ionicons name={currentStep.icon} size={20} color={currentStep.color} />
-          <Text style={[styles.statusBadgeText, { color: currentStep.color }]}>
+        {/* Badge estado actual — morado mientras avanza, verde al entregar */}
+        <View style={[styles.statusBadge, { backgroundColor: badgeColor + '18', borderColor: badgeColor }]}>
+          <Ionicons name={currentStep.icon} size={20} color={badgeColor} />
+          <Text style={[styles.statusBadgeText, { color: badgeColor }]}>
             {currentStep.label}
           </Text>
         </View>
 
         {/* Timeline */}
         <View style={styles.timelineCard}>
-          {STEPS.map((step, index) => {
+          {steps.map((step, index) => {
             const isDone    = index < currentIndex;
             const isCurrent = index === currentIndex;
             const isFuture  = index > currentIndex;
-            const isLast    = index === STEPS.length - 1;
+            const isLast    = index === steps.length - 1;
 
-            const dotColor  = isFuture ? '#CCC' : step.color;
-            const lineColor = isDone || isCurrent ? step.color : '#E0E0E0';
+            // Esquema fijo de 3 colores en vez de un color suelto por paso:
+            // gris = todavía no llega, morado = en curso, verde = completado.
+            const dotColor = isDone ? C.success : isCurrent ? C.primary : '#CCC';
 
             return (
               <View key={step.key} style={styles.timelineRow}>
 
                 {/* Columna izquierda: dot + línea */}
                 <View style={styles.timelineLeft}>
+                  {isCurrent && (
+                    <Animated.View
+                      style={[styles.pulseHalo, { backgroundColor: C.primary, transform: [{ scale: pulse }] }]}
+                      pointerEvents="none"
+                    />
+                  )}
                   <View style={[
                     styles.dot,
                     { borderColor: dotColor, backgroundColor: isFuture ? '#FFF' : dotColor },
@@ -191,7 +262,7 @@ export default function OrderTrackingScreen() {
                     )}
                   </View>
                   {!isLast && (
-                    <View style={[styles.line, { backgroundColor: index < currentIndex ? STEPS[index].color : '#E0E0E0' }]} />
+                    <View style={[styles.line, { backgroundColor: index < currentIndex ? C.success : '#E0E0E0' }]} />
                   )}
                 </View>
 
@@ -200,13 +271,13 @@ export default function OrderTrackingScreen() {
                   <View style={styles.stepHeader}>
                     <Text style={[
                       styles.stepLabel,
-                      isCurrent && { color: step.color, fontWeight: '700' },
+                      isCurrent && { color: C.primary, fontWeight: '700' },
                       isFuture  && styles.stepLabelFuture,
                     ]}>
                       {step.label}
                     </Text>
                     {isCurrent && (
-                      <View style={[styles.activePill, { backgroundColor: step.color }]}>
+                      <View style={[styles.activePill, { backgroundColor: C.primary }]}>
                         <Text style={styles.activePillText}>Actual</Text>
                       </View>
                     )}
@@ -236,26 +307,33 @@ export default function OrderTrackingScreen() {
         <View style={styles.operatorCard}>
           <View style={styles.operatorHeader}>
             <View style={styles.operatorAvatar}>
-              <Ionicons
-                name={operatorRole === 'cochero' ? 'bicycle' : 'car'}
-                size={22}
-                color="#3D1F8B"
-              />
+              <Ionicons name={op.icon} size={22} color={C.primary} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.operatorRole}>
-                {operatorRole === 'cochero' ? 'Cochero' : 'Transportista'}
+              <Text style={styles.operatorRole}>{op.role}</Text>
+              <Text style={styles.operatorName}>
+                {opUnassigned ? op.searching : op.name}
               </Text>
-              <Text style={styles.operatorName}>{operatorName}</Text>
             </View>
-            <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
-              <Ionicons name="call" size={20} color="#FFF" />
-            </TouchableOpacity>
+            {!opUnassigned && (
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {!!op.uid && (
+                  <TouchableOpacity style={styles.callBtn} onPress={handleMessage}>
+                    <Ionicons name="chatbubble-ellipses" size={18} color="#FFF" />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
+                  <Ionicons name="call" size={20} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
-          <View style={styles.phoneRow}>
-            <Ionicons name="phone-portrait-outline" size={15} color="#9B8EC4" />
-            <Text style={styles.phoneText}>{operatorPhone}</Text>
-          </View>
+          {!opUnassigned && !!op.phone && (
+            <View style={styles.phoneRow}>
+              <Ionicons name="phone-portrait-outline" size={15} color={C.textFaint} />
+              <Text style={styles.phoneText}>{op.phone}</Text>
+            </View>
+          )}
         </View>
 
         {/* Botón rastrear en mapa */}
@@ -286,10 +364,46 @@ export default function OrderTrackingScreen() {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const makeStyles = (C: ThemeColors) => StyleSheet.create({
+  paymentBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    marginBottom: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    backgroundColor: C.surface,
+  },
+  paymentBannerText: { flex: 1, fontSize: 13.5, lineHeight: 19, color: C.text },
   safe: {
     flex: 1,
-    backgroundColor: '#3D1F8B',
+    backgroundColor: C.headerGradient[0],
+  },
+
+  // Pedido no encontrado
+  notFoundContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 16,
+  },
+  notFoundText: {
+    color: '#FFF',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  notFoundBtn: {
+    backgroundColor: C.success,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+  },
+  notFoundBtnText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 
   // Header
@@ -298,7 +412,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#3D1F8B',
   },
   backBtn: {
     width: 40,
@@ -315,7 +428,7 @@ const styles = StyleSheet.create({
 
   // Contenido
   content: {
-    backgroundColor: '#F7F5FF',
+    backgroundColor: C.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 24,
@@ -344,12 +457,12 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 13,
-    color: '#9B8EC4',
+    color: C.textFaint,
     flex: 1,
   },
   summaryValue: {
     fontSize: 14,
-    color: '#1A1A1A',
+    color: C.text,
     fontWeight: '600',
     textAlign: 'right',
     maxWidth: '55%',
@@ -359,7 +472,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#F0EEFF',
+    backgroundColor: C.primaryFaint,
   },
 
   // Badge estado
@@ -400,6 +513,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 32,
   },
+  // Halo detrás del punto del paso actual — pulsa con Animated (ver `pulse`
+  // en el componente), da la sensación de que ese paso está "vivo" ahora.
+  pulseHalo: {
+    position: 'absolute',
+    top: -6,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    opacity: 0.18,
+  },
   dot: {
     width: 28,
     height: 28,
@@ -435,7 +558,7 @@ const styles = StyleSheet.create({
   stepLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: C.text,
   },
   stepLabelFuture: {
     color: '#BDBDBD',
@@ -480,13 +603,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#EDE7F6',
+    backgroundColor: C.primaryFaint,
     justifyContent: 'center',
     alignItems: 'center',
   },
   operatorRole: {
     fontSize: 12,
-    color: '#9B8EC4',
+    color: C.textFaint,
     fontWeight: '500',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -494,14 +617,14 @@ const styles = StyleSheet.create({
   operatorName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.text,
     marginTop: 1,
   },
   callBtn: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#3D1F8B',
+    backgroundColor: C.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -515,7 +638,7 @@ const styles = StyleSheet.create({
   },
   phoneText: {
     fontSize: 13,
-    color: '#555',
+    color: C.textSoft,
   },
 
   // Tarjeta éxito
@@ -538,11 +661,11 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#1A1A1A',
+    color: C.text,
   },
   successSubtitle: {
     fontSize: 14,
-    color: '#9B8EC4',
+    color: C.textFaint,
   },
 
   // Botón nuevo pedido
@@ -551,7 +674,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#2ECC71',
+    backgroundColor: C.success,
     borderRadius: 14,
     paddingVertical: 16,
     shadowColor: '#2ECC71',
@@ -572,10 +695,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#F9A825',
+    backgroundColor: C.primary,
     borderRadius: 14,
     paddingVertical: 16,
-    shadowColor: '#F9A825',
+    shadowColor: C.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,

@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type CartItem = {
   productId: string;
@@ -22,50 +24,58 @@ type CartStore = {
   clearCart: () => void;
 };
 
-export const useCartStore = create<CartStore>((set, get) => ({
-  items: [],
-  totalItems: 0,
+export const useCartStore = create<CartStore>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      totalItems: 0,
 
-  addItem: ({ productId, presentationIndex, presentationLabel, presentationPrice, quantity = 1 }) => {
-    const key = itemKey(productId, presentationIndex);
-    const existing = get().items.find(
-      i => itemKey(i.productId, i.presentationIndex) === key,
-    );
-    let newItems: CartItem[];
-    if (existing) {
-      newItems = get().items.map(i =>
-        itemKey(i.productId, i.presentationIndex) === key
-          ? { ...i, quantity: i.quantity + quantity }
-          : i,
-      );
-    } else {
-      newItems = [
-        ...get().items,
-        { productId, presentationIndex, presentationLabel, presentationPrice, quantity },
-      ];
+      addItem: ({ productId, presentationIndex, presentationLabel, presentationPrice, quantity = 1 }) => {
+        const key = itemKey(productId, presentationIndex);
+        const existing = get().items.find(
+          i => itemKey(i.productId, i.presentationIndex) === key,
+        );
+        let newItems: CartItem[];
+        if (existing) {
+          newItems = get().items.map(i =>
+            itemKey(i.productId, i.presentationIndex) === key
+              ? { ...i, quantity: i.quantity + quantity }
+              : i,
+          );
+        } else {
+          newItems = [
+            ...get().items,
+            { productId, presentationIndex, presentationLabel, presentationPrice, quantity },
+          ];
+        }
+        set({ items: newItems, totalItems: newItems.reduce((s, i) => s + i.quantity, 0) });
+      },
+
+      updateQuantity: (productId, presentationIndex, delta) => {
+        const key = itemKey(productId, presentationIndex);
+        const newItems = get().items
+          .map(i =>
+            itemKey(i.productId, i.presentationIndex) === key
+              ? { ...i, quantity: Math.max(0, i.quantity + delta) }
+              : i,
+          )
+          .filter(i => i.quantity > 0);
+        set({ items: newItems, totalItems: newItems.reduce((s, i) => s + i.quantity, 0) });
+      },
+
+      removeItem: (productId, presentationIndex) => {
+        const key = itemKey(productId, presentationIndex);
+        const newItems = get().items.filter(
+          i => itemKey(i.productId, i.presentationIndex) !== key,
+        );
+        set({ items: newItems, totalItems: newItems.reduce((s, i) => s + i.quantity, 0) });
+      },
+
+      clearCart: () => set({ items: [], totalItems: 0 }),
+    }),
+    {
+      name: 'higo-cart',
+      storage: createJSONStorage(() => AsyncStorage),
     }
-    set({ items: newItems, totalItems: newItems.reduce((s, i) => s + i.quantity, 0) });
-  },
-
-  updateQuantity: (productId, presentationIndex, delta) => {
-    const key = itemKey(productId, presentationIndex);
-    const newItems = get().items
-      .map(i =>
-        itemKey(i.productId, i.presentationIndex) === key
-          ? { ...i, quantity: Math.max(0, i.quantity + delta) }
-          : i,
-      )
-      .filter(i => i.quantity > 0);
-    set({ items: newItems, totalItems: newItems.reduce((s, i) => s + i.quantity, 0) });
-  },
-
-  removeItem: (productId, presentationIndex) => {
-    const key = itemKey(productId, presentationIndex);
-    const newItems = get().items.filter(
-      i => itemKey(i.productId, i.presentationIndex) !== key,
-    );
-    set({ items: newItems, totalItems: newItems.reduce((s, i) => s + i.quantity, 0) });
-  },
-
-  clearCart: () => set({ items: [], totalItems: 0 }),
-}));
+  )
+);

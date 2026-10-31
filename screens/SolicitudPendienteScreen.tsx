@@ -1,19 +1,26 @@
-import { useRef, useEffect } from 'react';
+import {
+  useRef,
+  useEffect,
+  useState } from 'react';
 import {
   StyleSheet,
-  Text,
   View,
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
   Animated,
 } from 'react-native';
+import Text from '../components/Text';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
+import { collection, query, where, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { RootStackParamList } from '../navigation/types';
-import { useAdminSolicitudesStore } from '../store/adminSolicitudesStore';
+import { Solicitud } from '../store/adminSolicitudesStore';
 import { useAuthStore } from '../store/authStore';
+import { db } from '../lib/firebase';
+import { useThemeColors } from '../theme/useThemeColors';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'SolicitudPendiente'>;
@@ -21,20 +28,28 @@ type Props = {
 };
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
+// El fondo de esta pantalla es siempre el morado de marca (C.primary del tema);
+// el resto de colores son indicadores de estado fijos sobre ese fondo.
 
-const C = {
-  bg:          '#3D1F8B',
-  card:        'rgba(255,255,255,0.10)',
-  white:       '#FFFFFF',
-  soft:        'rgba(255,255,255,0.60)',
-  green:       '#27AE60',
-  greenFaint:  'rgba(39,174,96,0.18)',
-  red:         '#FF8A80',
-  redFaint:    'rgba(231,76,60,0.20)',
-  redBorder:   'rgba(231,76,60,0.40)',
-  amber:       '#F2C94C',
-  amberFaint:  'rgba(242,201,76,0.18)',
-};
+function useScreenColors() {
+  const T = useThemeColors();
+  return {
+    bg:          T.primary,
+    headerGradient: T.headerGradient,
+    statusBar:   T.statusBarStyle,
+    card:        'rgba(255,255,255,0.10)',
+    white:       '#FFFFFF',
+    soft:        'rgba(255,255,255,0.60)',
+    green:       '#27AE60',
+    greenFaint:  'rgba(39,174,96,0.18)',
+    red:         '#FF8A80',
+    redFaint:    'rgba(231,76,60,0.20)',
+    redBorder:   'rgba(231,76,60,0.40)',
+    amber:       '#F2C94C',
+    amberFaint:  'rgba(242,201,76,0.18)',
+  };
+}
+type ScreenColors = ReturnType<typeof useScreenColors>;
 
 // ─── Ruta de dashboard por rol ────────────────────────────────────────────────
 
@@ -47,11 +62,37 @@ const DASHBOARD_ROUTE: Record<string, keyof RootStackParamList> = {
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
 
 export default function SolicitudPendienteScreen({ navigation, route }: Props) {
-  const { solicitudId } = route.params;
-  const solicitudes = useAdminSolicitudesStore((s) => s.solicitudes);
-  const staffLogin  = useAuthStore((s) => s.staffLogin);
+  const C = useScreenColors();
+  const styles = makeStyles(C);
+  const authUser = useAuthStore((s) => s.user);
+  const [sol, setSol]         = useState<Solicitud | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const sol = solicitudes.find((s) => s.id === solicitudId);
+  // Se busca por uid del usuario autenticado (no por el store de admin, al que
+  // un usuario no-admin no tiene permiso de leer completo) — así también
+  // funciona si se reabre la app estando todavía pendiente, sin depender de
+  // que se haya pasado solicitudId por parámetro.
+  useEffect(() => {
+    if (!authUser) return;
+    const q = query(
+      collection(db, 'solicitudes'),
+      where('uid', '==', authUser.uid),
+      orderBy('requestedAt', 'desc'),
+      limit(1)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const d = snap.docs[0];
+      if (!d) { setSol(null); setLoading(false); return; }
+      const data = d.data();
+      setSol({
+        ...data,
+        id: d.id,
+        requestedAt: (data.requestedAt as Timestamp | undefined)?.toDate() ?? new Date(),
+      } as Solicitud);
+      setLoading(false);
+    });
+    return unsub;
+  }, [authUser?.uid]);
 
   // Animación de pulso para el estado pendiente
   const pulse = useRef(new Animated.Value(1)).current;
@@ -71,7 +112,9 @@ export default function SolicitudPendienteScreen({ navigation, route }: Props) {
   }
 
   function handleEntrar() {
-    staffLogin(sol!);
+    // La sesión ya está activa desde el registro — AppNavigator redirige solo
+    // apenas el status pasa a "approved". Este reset es un respaldo manual
+    // por si esa actualización todavía no llegó a este dispositivo.
     navigation.reset({
       index: 0,
       routes: [{ name: DASHBOARD_ROUTE[sol!.role] }],
@@ -88,7 +131,8 @@ export default function SolicitudPendienteScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+      <StatusBar barStyle={C.statusBar} backgroundColor={C.bg} />
+      <LinearGradient colors={C.headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }}>
 
       {/* ── Botón atrás — visible en los 3 estados ── */}
       <View style={styles.topBar}>
@@ -99,8 +143,13 @@ export default function SolicitudPendienteScreen({ navigation, route }: Props) {
 
       <View style={styles.center}>
 
+        {/* ── Cargando ── */}
+        {loading && (
+          <Text style={styles.softText}>Buscando tu solicitud…</Text>
+        )}
+
         {/* ── Solicitud no encontrada ── */}
-        {!sol && (
+        {!loading && !sol && (
           <>
             <Text style={styles.softText}>No se encontró la solicitud.</Text>
           </>
@@ -184,13 +233,14 @@ export default function SolicitudPendienteScreen({ navigation, route }: Props) {
         )}
 
       </View>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const makeStyles = (C: ScreenColors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   // Barra superior con botón atrás
@@ -236,6 +286,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: C.white,
     textAlign: 'center',
+    letterSpacing: -0.4,
   },
   subtitle: {
     fontSize: 15,
@@ -253,7 +304,7 @@ const styles = StyleSheet.create({
   // Card de info del usuario
   infoCard: {
     backgroundColor: C.card,
-    borderRadius: 16,
+    borderRadius: 18,
     paddingVertical: 14,
     paddingHorizontal: 28,
     alignItems: 'center',
@@ -296,7 +347,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     backgroundColor: C.green,
-    borderRadius: 16,
+    borderRadius: 18,
     paddingVertical: 18,
     width: '100%',
     marginTop: 4,
@@ -321,7 +372,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.30)',
-    borderRadius: 16,
+    borderRadius: 18,
     paddingVertical: 18,
     width: '100%',
     marginTop: 4,

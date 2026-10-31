@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react';
+import {
+  useState,
+  useRef } from 'react';
 import {
   StyleSheet,
-  Text,
   View,
   ScrollView,
   TouchableOpacity,
@@ -11,52 +12,61 @@ import {
   Linking,
   Platform,
 } from 'react-native';
+import Text from '../components/Text';
 import MapView, { Marker, UrlTile, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
 import {
   useTransportistaDeliveryStore,
   Delivery,
-  DeliveryStatus,
   WAREHOUSE_LAT,
   WAREHOUSE_LNG,
 } from '../store/transportistaDeliveryStore';
 import { useTransportistaStore } from '../store/transportistaStore';
 import { useAuthStore } from '../store/authStore';
+import { useThemeColors } from '../theme/useThemeColors';
+import { cardShadow } from '../theme/elevation';
+import AppearanceSelector from '../components/AppearanceSelector';
+import { pickAvatarPhoto } from '../lib/pickAvatarPhoto';
+import Avatar from '../components/Avatar';
 import {
-  TRANSPORTISTA_BASE,
-  TRANSPORTISTA_PER_KM,
   nextPayFriday,
   formatShortDate,
 } from '../utils/earnings';
+import { VEHICLES } from '../utils/transport';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
+// El morado de marca de la app es el color de este dashboard (fijo en ambos
+// temas, igual que en Cochero y Comerciante — los 3 paneles operativos
+// comparten identidad en vez de cada uno tener un color suelto); los
+// fondos/superficies/texto se adaptan según el tema activo.
 
-const C = {
-  header:       '#8B6914',
-  headerDark:   '#5C3D08',
-  amber:        '#F2C94C',
-  amberFaint:   '#FFFAE0',
-  amberLight:   '#FCE9A0',
-  amberBorder:  '#F0D98A',
-  green:        '#2ECC71',
-  greenDark:    '#27AE60',
-  greenFaint:   '#EAFAF1',
-  blue:         '#1565C0',
-  blueFaint:    '#E3F2FD',
-  orange:       '#E67E22',
-  orangeFaint:  '#FEF0E0',
-  bg:           '#FFFBF0',
-  white:        '#FFFFFF',
-  text:         '#1A1A1A',
-  textMid:      '#4A4A4A',
-  textSoft:     '#888',
-  tabActive:    '#8B6914',
-  tabInactive:  '#9B9B9B',
-};
+function useScreenColors() {
+  const T = useThemeColors();
+  return {
+    header:       '#3D1F8B',
+    headerDark:   '#2D1570',
+    headerFaint:  T.primaryFaint,
+    amberBorder:  T.border,
+    green:        '#2ECC71',
+    greenDark:    '#27AE60',
+    greenFaint:   T.successFaint,
+    orange:       '#E67E22',
+    orangeFaint:  T.warningFaint,
+    bg:           T.background,
+    white:        T.surface,
+    text:         T.text,
+    textMid:      T.textSoft,
+    textSoft:     T.textFaint,
+    tabActive:    '#3D1F8B',
+    tabInactive:  T.textFaint,
+  };
+}
+type ScreenColors = ReturnType<typeof useScreenColors>;
 
-type Tab = 'entregas' | 'ganancias' | 'perfil';
+type Tab = 'entregas' | 'mapa' | 'ganancias' | 'perfil';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'TransportistaDashboard'>;
@@ -65,10 +75,13 @@ type Props = {
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 
 export default function TransportistaDashboardScreen({ navigation }: Props) {
+  const C = useScreenColors();
+  const styles = makeStyles(C);
   const [activeTab, setActiveTab] = useState<Tab>('entregas');
 
   const {
-    deliveries,
+    disponibles,
+    mias,
     disponible,
     toggleDisponible,
     iniciarEntrega,
@@ -77,24 +90,31 @@ export default function TransportistaDashboardScreen({ navigation }: Props) {
 
   const user = useAuthStore((s) => s.user);
 
-  const pendientes  = deliveries.filter((d) => d.status === 'pendiente').length;
-  const totalHoy    = deliveries.reduce((s, d) => s + d.earning, 0);
+  const entregadasHoy = mias.filter((d) => d.status === 'entregado').length;
+  const totalHoy       = mias.reduce((s, d) => s + d.earning, 0);
+  const activeDelivery = mias.find((d) => d.status === 'en_camino') ?? null;
+  const mapPoints      = [...disponibles, ...mias];
+
+  function openInMaps(delivery: Delivery) {
+    if (delivery.lat == null || delivery.lng == null) return;
+    const url = `https://www.google.com/maps/dir/?api=1` +
+      `&origin=${WAREHOUSE_LAT},${WAREHOUSE_LNG}` +
+      `&destination=${delivery.lat},${delivery.lng}` +
+      `&travelmode=driving`;
+    Linking.openURL(url);
+  }
 
   function handleIniciar(delivery: Delivery) {
     Alert.alert(
       'Iniciar entrega',
-      `¿Comenzar la entrega a ${delivery.clientName}?`,
+      `Vas a tomar el pedido #${delivery.id.slice(0, 6)} y salir hacia la dirección de entrega.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Sí, iniciar',
           onPress: () => {
             iniciarEntrega(delivery.id);
-            const url = `https://www.google.com/maps/dir/?api=1` +
-              `&origin=${WAREHOUSE_LAT},${WAREHOUSE_LNG}` +
-              `&destination=${delivery.lat},${delivery.lng}` +
-              `&travelmode=driving`;
-            Linking.openURL(url);
+            openInMaps(delivery);
           },
         },
       ]
@@ -104,7 +124,9 @@ export default function TransportistaDashboardScreen({ navigation }: Props) {
   function handleConfirmar(delivery: Delivery) {
     Alert.alert(
       'Confirmar entrega',
-      `¿Confirmar que entregaste el pedido a ${delivery.clientName}?`,
+      delivery.cashToCollect > 0
+        ? `¿Entregaste el pedido #${delivery.id.slice(0, 6)} y cobraste ${delivery.cashToCollect.toFixed(2)} en efectivo?`
+        : `¿Confirmás que entregaste el pedido #${delivery.id.slice(0, 6)}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Sí, confirmar', onPress: () => confirmarEntrega(delivery.id) },
@@ -117,13 +139,9 @@ export default function TransportistaDashboardScreen({ navigation }: Props) {
       <StatusBar barStyle="light-content" backgroundColor={C.headerDark} />
 
       {/* ── Header ── */}
-      <View style={styles.header}>
+      <LinearGradient colors={[C.header, C.headerDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.avatarCircle}>
-            <Text style={{ fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.9)' }}>
-              {user?.name?.[0]?.toUpperCase() ?? 'T'}
-            </Text>
-          </View>
+          <Avatar name={user?.name ?? 'Transportista'} photoUri={user?.photoUri} size={46} />
           <View>
             <Text style={styles.headerGreeting}>Hola,</Text>
             <Text style={styles.headerName}>{user?.name ?? 'Transportista'}</Text>
@@ -140,16 +158,25 @@ export default function TransportistaDashboardScreen({ navigation }: Props) {
             {disponible ? 'Disponible' : 'No disponible'}
           </Text>
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       {/* ── Contenido por tab ── */}
       <View style={styles.body}>
         {activeTab === 'entregas' && (
           <EntregasTab
-            deliveries={deliveries}
+            disponibles={disponibles}
+            mias={mias}
+            entregadasHoy={entregadasHoy}
             totalHoy={totalHoy}
             onIniciar={handleIniciar}
             onConfirmar={handleConfirmar}
+          />
+        )}
+        {activeTab === 'mapa'      && (
+          <MapaTab
+            activeDelivery={activeDelivery}
+            deliveries={mapPoints}
+            onOpenMaps={openInMaps}
           />
         )}
         {activeTab === 'ganancias' && <GananciasTab />}
@@ -165,8 +192,14 @@ export default function TransportistaDashboardScreen({ navigation }: Props) {
           icon="cube-outline"
           label="Entregas"
           active={activeTab === 'entregas'}
-          badge={pendientes}
+          badge={disponibles.length}
           onPress={() => setActiveTab('entregas')}
+        />
+        <TabBarItem
+          icon="map-outline"
+          label="Mapa"
+          active={activeTab === 'mapa'}
+          onPress={() => setActiveTab('mapa')}
         />
         <TabBarItem
           icon="cash-outline"
@@ -188,18 +221,23 @@ export default function TransportistaDashboardScreen({ navigation }: Props) {
 // ─── Tab: Entregas ────────────────────────────────────────────────────────────
 
 function EntregasTab({
-  deliveries,
+  disponibles,
+  mias,
+  entregadasHoy,
   totalHoy,
   onIniciar,
   onConfirmar,
 }: {
-  deliveries: Delivery[];
-  totalHoy:   number;
-  onIniciar:  (d: Delivery) => void;
-  onConfirmar:(d: Delivery) => void;
+  disponibles:   Delivery[];
+  mias:          Delivery[];
+  entregadasHoy: number;
+  totalHoy:      number;
+  onIniciar:     (d: Delivery) => void;
+  onConfirmar:   (d: Delivery) => void;
 }) {
-  const pendientes   = deliveries.filter((d) => d.status === 'pendiente').length;
-  const entregadas   = deliveries.filter((d) => d.status === 'entregado').length;
+  const C = useScreenColors();
+  const styles = makeStyles(C);
+  const enCurso = mias.filter((d) => d.status !== 'entregado').length;
 
   return (
     <ScrollView
@@ -211,47 +249,50 @@ function EntregasTab({
       <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, { flex: 1 }]}>
           <Ionicons name="cube-outline" size={20} color={C.header} />
-          <Text style={styles.summaryValue}>{deliveries.length}</Text>
-          <Text style={styles.summaryLabel}>Entregas hoy</Text>
+          <Text style={styles.summaryValue}>{enCurso}</Text>
+          <Text style={styles.summaryLabel}>En curso</Text>
         </View>
         <View style={[styles.summaryCard, { flex: 1 }]}>
           <Ionicons name="checkmark-circle-outline" size={20} color={C.greenDark} />
-          <Text style={[styles.summaryValue, { color: C.greenDark }]}>{entregadas}</Text>
-          <Text style={styles.summaryLabel}>Completadas</Text>
+          <Text style={[styles.summaryValue, { color: C.greenDark }]}>{entregadasHoy}</Text>
+          <Text style={styles.summaryLabel}>Entregadas</Text>
         </View>
-        <View style={[styles.summaryCard, styles.summaryCardAmber, { flex: 1 }]}>
-          <Ionicons name="cash-outline" size={20} color={C.headerDark} />
-          <Text style={[styles.summaryValue, { color: C.headerDark }]}>${totalHoy.toFixed(2)}</Text>
-          <Text style={[styles.summaryLabel, { color: C.header }]}>Ganancia</Text>
+        <View style={[styles.summaryCard, styles.summaryCardHeader, { flex: 1 }]}>
+          <Ionicons name="cash-outline" size={20} color={C.white} />
+          <Text style={[styles.summaryValue, { color: C.white }]}>${totalHoy.toFixed(2)}</Text>
+          <Text style={[styles.summaryLabel, { color: 'rgba(255,255,255,0.8)' }]}>Ganancia</Text>
         </View>
       </View>
 
-      {/* Lista de entregas */}
-      <Text style={styles.sectionTitle}>Entregas del día</Text>
+      {/* Disponibles */}
+      <Text style={styles.sectionTitle}>Disponibles ({disponibles.length})</Text>
+      {disponibles.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="file-tray-outline" size={40} color={C.textSoft} />
+          <Text style={styles.emptyStateText}>No hay pedidos listos para transportar</Text>
+        </View>
+      ) : (
+        disponibles.map((d) => (
+          <DeliveryCard key={d.id} delivery={d} onIniciar={() => onIniciar(d)} />
+        ))
+      )}
 
-      {deliveries.map((delivery) => (
-        <DeliveryCard
-          key={delivery.id}
-          delivery={delivery}
-          onIniciar={() => onIniciar(delivery)}
-          onConfirmar={() => onConfirmar(delivery)}
-        />
-      ))}
+      {/* Mis entregas */}
+      <Text style={styles.sectionTitle}>Mis entregas</Text>
+      {mias.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="cube-outline" size={40} color={C.textSoft} />
+          <Text style={styles.emptyStateText}>Todavía no tomaste ninguna entrega</Text>
+        </View>
+      ) : (
+        mias.map((d) => (
+          <DeliveryCard key={d.id} delivery={d} onConfirmar={() => onConfirmar(d)} />
+        ))
+      )}
 
       <View style={{ height: 16 }} />
     </ScrollView>
   );
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function vehicleIcon(vehicle: string): keyof typeof Ionicons.glyphMap {
-  switch (vehicle) {
-    case 'moto':      return 'bicycle-outline';
-    case 'taxi':      return 'car-outline';
-    case 'camioneta': return 'car';
-    default:          return 'car-outline';
-  }
 }
 
 // ─── Card de entrega ──────────────────────────────────────────────────────────
@@ -261,25 +302,29 @@ function DeliveryCard({
   onIniciar,
   onConfirmar,
 }: {
-  delivery:   Delivery;
-  onIniciar:  () => void;
-  onConfirmar:() => void;
+  delivery:     Delivery;
+  onIniciar?:   () => void;
+  onConfirmar?: () => void;
 }) {
-  const isPendiente  = delivery.status === 'pendiente';
+  const C = useScreenColors();
+  const styles = makeStyles(C);
+  const isDisponible = delivery.status === 'recibido' || delivery.status === 'consolidado';
   const isEnCamino   = delivery.status === 'en_camino';
   const isEntregado  = delivery.status === 'entregado';
 
   const statusColor =
-    isPendiente  ? C.textSoft  :
-    isEnCamino   ? C.orange    : C.greenDark;
+    isDisponible ? C.textSoft :
+    isEnCamino   ? C.orange   : C.greenDark;
 
   const statusLabel =
-    isPendiente  ? 'Pendiente'   :
-    isEnCamino   ? 'En camino'   : 'Entregado';
+    isDisponible ? 'Disponible' :
+    isEnCamino   ? 'En camino'  : 'Entregado';
 
   const statusIcon: keyof typeof Ionicons.glyphMap =
-    isPendiente  ? 'time-outline'      :
-    isEnCamino   ? 'navigate'          : 'checkmark-circle';
+    isDisponible ? 'time-outline' :
+    isEnCamino   ? 'navigate'     : 'checkmark-circle';
+
+  const isDirecta = delivery.route === 'directa';
 
   return (
     <View style={[
@@ -290,7 +335,7 @@ function DeliveryCard({
       {/* Cabecera */}
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
-          <Text style={styles.cardOrderId}>Pedido #{delivery.id}</Text>
+          <Text style={styles.cardOrderId}>Pedido #{delivery.id.slice(0, 6)}</Text>
           <View style={styles.timeSlotRow}>
             <Ionicons name="time-outline" size={12} color={C.textSoft} />
             <Text style={styles.timeSlotText}>{delivery.timeSlot}</Text>
@@ -302,11 +347,23 @@ function DeliveryCard({
         </View>
       </View>
 
-      {/* Cliente */}
+      {/* Ruta */}
       <View style={styles.clientRow}>
-        <Ionicons name="person-outline" size={14} color={C.textSoft} />
-        <Text style={styles.clientName}>{delivery.clientName}</Text>
+        <Ionicons name={isDirecta ? 'flash-outline' : 'storefront-outline'} size={14} color={C.textSoft} />
+        <Text style={styles.clientName}>
+          {isDirecta ? 'Lo antes posible · retirar del cochero' : 'Programada · retirar del cochero'}
+        </Text>
       </View>
+
+      {/* Cobro en efectivo */}
+      {delivery.cashToCollect > 0 && !isEntregado && (
+        <View style={styles.clientRow}>
+          <Ionicons name="cash-outline" size={14} color={C.orange} />
+          <Text style={[styles.clientName, { color: C.orange, fontWeight: '700' }]}>
+            Cobrar ${delivery.cashToCollect.toFixed(2)} en efectivo
+          </Text>
+        </View>
+      )}
 
       {/* Dirección */}
       <View style={styles.addressRow}>
@@ -320,10 +377,10 @@ function DeliveryCard({
       {/* Métricas */}
       <View style={styles.metricsRow}>
         <View style={styles.metricItem}>
-          <Ionicons name={vehicleIcon(delivery.vehicle)} size={22} color={C.header} />
+          <Ionicons name="cube-outline" size={18} color={C.header} />
           <View>
-            <Text style={styles.metricLabel}>Vehículo</Text>
-            <Text style={styles.metricValue}>{delivery.vehicleLabel}</Text>
+            <Text style={styles.metricLabel}>Productos</Text>
+            <Text style={styles.metricValue}>{delivery.itemCount}</Text>
           </View>
         </View>
         <View style={styles.metricDivider} />
@@ -331,15 +388,17 @@ function DeliveryCard({
           <Ionicons name="navigate-outline" size={18} color={C.header} />
           <View>
             <Text style={styles.metricLabel}>Distancia</Text>
-            <Text style={styles.metricValue}>{delivery.distanceKm.toFixed(1)} km</Text>
+            <Text style={styles.metricValue}>
+              {delivery.distanceKm > 0 ? `${delivery.distanceKm.toFixed(1)} km` : '—'}
+            </Text>
           </View>
         </View>
         <View style={styles.metricDivider} />
         <View style={styles.metricItem}>
-          <Ionicons name="cash-outline" size={18} color={C.greenDark} />
+          <Ionicons name="cash-outline" size={18} color={C.header} />
           <View>
             <Text style={styles.metricLabel}>Ganancia</Text>
-            <Text style={[styles.metricValue, { color: C.greenDark }]}>
+            <Text style={[styles.metricValue, { color: C.header }]}>
               +${delivery.earning.toFixed(2)}
             </Text>
           </View>
@@ -347,7 +406,7 @@ function DeliveryCard({
       </View>
 
       {/* Botones de acción */}
-      {isPendiente && (
+      {isDisponible && onIniciar && (
         <TouchableOpacity style={styles.iniciarBtn} activeOpacity={0.85} onPress={onIniciar}>
           <Ionicons name="navigate-outline" size={18} color={C.white} />
           <Text style={styles.iniciarBtnText}>Iniciar entrega</Text>
@@ -358,12 +417,14 @@ function DeliveryCard({
         <View style={styles.actionGroup}>
           <View style={styles.enCaminoBanner}>
             <Ionicons name="navigate" size={15} color={C.orange} />
-            <Text style={styles.enCaminoText}>En camino al destino...</Text>
+            <Text style={styles.enCaminoText}>En camino al destino…</Text>
           </View>
-          <TouchableOpacity style={styles.confirmarBtn} activeOpacity={0.85} onPress={onConfirmar}>
-            <Ionicons name="checkmark-circle-outline" size={18} color={C.white} />
-            <Text style={styles.confirmarBtnText}>Confirmar entrega</Text>
-          </TouchableOpacity>
+          {onConfirmar && (
+            <TouchableOpacity style={styles.confirmarBtn} activeOpacity={0.85} onPress={onConfirmar}>
+              <Ionicons name="checkmark-circle-outline" size={18} color={C.white} />
+              <Text style={styles.confirmarBtnText}>Confirmar entrega</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -379,11 +440,13 @@ function DeliveryCard({
 
 // ─── Tab: Mapa ────────────────────────────────────────────────────────────────
 
+// Encuadre inicial: centrado entre el mercado (sur) y el grueso de Quito, para
+// que entren tanto el origen como las direcciones de entrega.
 const QUITO_REGION: Region = {
-  latitude:      -0.2105,
-  longitude:     -78.4900,
-  latitudeDelta:  0.18,
-  longitudeDelta: 0.18,
+  latitude:      -0.225,
+  longitude:     -78.508,
+  latitudeDelta:  0.24,
+  longitudeDelta: 0.14,
 };
 
 function MapaTab({
@@ -395,11 +458,13 @@ function MapaTab({
   deliveries:     Delivery[];
   onOpenMaps:     (d: Delivery) => void;
 }) {
+  const C = useScreenColors();
+  const styles = makeStyles(C);
   return (
     <View style={styles.mapContainer}>
       {/* Mapa */}
       <MapView
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         mapType="none"
         initialRegion={QUITO_REGION}
         showsUserLocation
@@ -427,25 +492,27 @@ function MapaTab({
         </Marker>
 
         {/* Marcadores de entregas */}
-        {deliveries.filter((d) => d.status !== 'entregado').map((d) => (
-          <Marker
-            key={d.id}
-            coordinate={{ latitude: d.lat, longitude: d.lng }}
-            title={`Pedido #${d.id}`}
-            description={d.clientName}
-          >
-            <View style={[
-              styles.deliveryMarker,
-              d.status === 'en_camino' && styles.deliveryMarkerActive,
-            ]}>
-              <Ionicons
-                name={d.status === 'en_camino' ? 'car' : 'cube'}
-                size={14}
-                color="#FFFFFF"
-              />
-            </View>
-          </Marker>
-        ))}
+        {deliveries
+          .filter((d) => d.status !== 'entregado' && d.lat != null && d.lng != null)
+          .map((d) => (
+            <Marker
+              key={d.id}
+              coordinate={{ latitude: d.lat as number, longitude: d.lng as number }}
+              title={`Pedido #${d.id.slice(0, 6)}`}
+              description={d.address}
+            >
+              <View style={[
+                styles.deliveryMarker,
+                d.status === 'en_camino' && styles.deliveryMarkerActive,
+              ]}>
+                <Ionicons
+                  name={d.status === 'en_camino' ? 'car' : 'cube'}
+                  size={14}
+                  color="#FFFFFF"
+                />
+              </View>
+            </Marker>
+          ))}
       </MapView>
 
       {/* Panel superior: entrega activa */}
@@ -455,10 +522,10 @@ function MapaTab({
             <View style={styles.mapActiveDot} />
             <View>
               <Text style={styles.mapActivePanelTitle}>
-                En camino · #{activeDelivery.id}
+                En camino · #{activeDelivery.id.slice(0, 6)}
               </Text>
               <Text style={styles.mapActivePanelSub} numberOfLines={1}>
-                {activeDelivery.clientName} · {activeDelivery.address}
+                {activeDelivery.address}
               </Text>
             </View>
           </View>
@@ -486,7 +553,7 @@ function MapaTab({
         </View>
         <View style={styles.mapLegendItem}>
           <Ionicons name="cube" size={15} color={C.headerDark} />
-          <Text style={styles.mapLegendText}>Entrega pendiente</Text>
+          <Text style={styles.mapLegendText}>Entrega por hacer</Text>
         </View>
         <View style={styles.mapLegendItem}>
           <Ionicons name="car" size={15} color={C.orange} />
@@ -500,6 +567,8 @@ function MapaTab({
 // ─── Tab: Ganancias ───────────────────────────────────────────────────────────
 
 function GananciasTab() {
+  const C = useScreenColors();
+  const styles = makeStyles(C);
   const {
     weeklyEarnings, weeklyKm,
     todayEarnings, todayDeliveriesCount, todayKm,
@@ -521,11 +590,11 @@ function GananciasTab() {
         <Text style={styles.weekCardLabel}>Saldo acumulado esta semana</Text>
         <Text style={styles.weekCardAmount}>${weeklyEarnings.toFixed(2)}</Text>
         <View style={styles.weekCardStats}>
-          <Ionicons name="navigate-outline" size={14} color={C.greenDark} />
+          <Ionicons name="navigate-outline" size={14} color={C.header} />
           <Text style={styles.weekCardStatText}>{weeklyKm.toFixed(1)} km · {totalDeliveriesCount} entregas</Text>
         </View>
         <View style={styles.payRow}>
-          <Ionicons name="calendar-outline" size={14} color={C.greenDark} />
+          <Ionicons name="calendar-outline" size={14} color={C.header} />
           <Text style={styles.payText}>Próximo pago: {formatShortDate(payFriday)}</Text>
         </View>
         <View style={styles.progressTrack}>
@@ -549,37 +618,28 @@ function GananciasTab() {
           <Text style={styles.summaryValue}>{todayKm.toFixed(1)}</Text>
           <Text style={styles.summaryLabel}>km</Text>
         </View>
-        <View style={[styles.summaryCard, styles.summaryCardAmber, { flex: 1 }]}>
-          <Ionicons name="wallet-outline" size={20} color={C.headerDark} />
-          <Text style={[styles.summaryValue, { color: C.headerDark }]}>${todayEarnings.toFixed(2)}</Text>
-          <Text style={[styles.summaryLabel, { color: C.header }]}>Ganancia</Text>
+        <View style={[styles.summaryCard, styles.summaryCardHeader, { flex: 1 }]}>
+          <Ionicons name="wallet-outline" size={20} color={C.white} />
+          <Text style={[styles.summaryValue, { color: C.white }]}>${todayEarnings.toFixed(2)}</Text>
+          <Text style={[styles.summaryLabel, { color: 'rgba(255,255,255,0.8)' }]}>Ganancia</Text>
         </View>
       </View>
 
       {/* Tarifa */}
-      <Text style={styles.sectionTitle}>Tarifa por entrega</Text>
+      {/* Cobra el envío completo que paga el cliente: tarifa según vehículo
+          (por el peso del pedido) y distancia desde el mercado. */}
+      <Text style={styles.sectionTitle}>Tarifa por entrega (el envío completo)</Text>
       <View style={styles.tarifaCard}>
-        <View style={styles.formulaRow}>
-          <View style={styles.formulaChip}>
-            <Text style={styles.formulaLabel}>Base fija</Text>
-            <Text style={styles.formulaValue}>${TRANSPORTISTA_BASE.toFixed(2)}</Text>
-          </View>
-          <Ionicons name="add" size={18} color={C.textSoft} />
-          <View style={styles.formulaChip}>
-            <Text style={styles.formulaLabel}>Por km</Text>
-            <Text style={styles.formulaValue}>${TRANSPORTISTA_PER_KM.toFixed(2)}</Text>
-          </View>
-        </View>
-        {[3, 7, 12, 20].map((km) => (
-          <View key={km} style={styles.exRow}>
+        {VEHICLES.map((v) => (
+          <View key={v.type} style={styles.exRow}>
             <View style={styles.kmBadge}>
-              <Text style={styles.kmBadgeText}>{km} km</Text>
+              <Text style={styles.kmBadgeText}>{v.emoji} {v.label}</Text>
             </View>
             <Text style={styles.exLabel}>
-              {km <= 5 ? 'Zona cercana' : km <= 10 ? 'Zona media' : km <= 15 ? 'Zona lejana' : 'Zona extra'}
+              {v.maxLbs === Infinity ? 'Más de 150 lb' : `Hasta ${v.maxLbs} lb`}
             </Text>
             <Text style={styles.exEarning}>
-              +${(TRANSPORTISTA_BASE + TRANSPORTISTA_PER_KM * km).toFixed(2)}
+              ${v.base.toFixed(2)} + ${v.perKm.toFixed(2)}/km
             </Text>
           </View>
         ))}
@@ -593,7 +653,10 @@ function GananciasTab() {
 // ─── Tab: Perfil ──────────────────────────────────────────────────────────────
 
 function PerfilTab({ onLogout }: { onLogout: () => void }) {
+  const C = useScreenColors();
+  const styles = makeStyles(C);
   const user = useAuthStore((s) => s.user);
+  const updatePhoto = useAuthStore((s) => s.updatePhoto);
   return (
     <ScrollView
       style={styles.scroll}
@@ -601,11 +664,14 @@ function PerfilTab({ onLogout }: { onLogout: () => void }) {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.perfilAvatarWrapper}>
-        <View style={styles.perfilAvatar}>
-          <Text style={{ fontSize: 32, fontWeight: '800', color: C.header }}>
-            {user?.name?.[0]?.toUpperCase() ?? 'T'}
-          </Text>
-        </View>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => pickAvatarPhoto(updatePhoto)}>
+          <View style={{ position: 'relative' }}>
+            <Avatar name={user?.name ?? 'Transportista'} photoUri={user?.photoUri} size={80} bg={C.headerFaint} textColor={C.header} />
+            <View style={styles.avatarEditBadge}>
+              <Ionicons name="camera" size={14} color={C.white} />
+            </View>
+          </View>
+        </TouchableOpacity>
         <Text style={styles.perfilName}>{user?.name ?? 'Transportista'}</Text>
         <View style={styles.perfilRolePill}>
           <Text style={styles.perfilRoleText}>Transportista</Text>
@@ -613,9 +679,9 @@ function PerfilTab({ onLogout }: { onLogout: () => void }) {
       </View>
 
       <View style={styles.perfilCard}>
-        <PerfilRow icon="call-outline"      label="Teléfono"   value={(user as any)?.phone ?? '—'} />
+        <PerfilRow icon="call-outline"      label="Teléfono"   value={user?.phone ?? '—'} />
         <View style={styles.cardDivider} />
-        <PerfilRow icon="card-outline"      label="Cédula"     value={(user as any)?.cedula ?? '—'} />
+        <PerfilRow icon="card-outline"      label="Cédula"     value={user?.cedula ?? '—'} />
         <View style={styles.cardDivider} />
         <PerfilRow icon="car-outline"       label="Vehículo"   value="Camioneta D-MAX" />
         <View style={styles.cardDivider} />
@@ -623,6 +689,9 @@ function PerfilTab({ onLogout }: { onLogout: () => void }) {
         <View style={styles.cardDivider} />
         <PerfilRow icon="shield-checkmark-outline" label="Estado" value="Verificado" valueColor={C.greenDark} />
       </View>
+
+      <Text style={styles.sectionTitle}>Apariencia</Text>
+      <AppearanceSelector accentColor={C.header} />
 
       <TouchableOpacity style={styles.logoutBtn} activeOpacity={0.85} onPress={onLogout}>
         <Ionicons name="log-out-outline" size={18} color="#E74C3C" />
@@ -642,6 +711,8 @@ function PerfilRow({
   value: string;
   valueColor?: string;
 }) {
+  const C = useScreenColors();
+  const styles = makeStyles(C);
   return (
     <View style={styles.perfilRow}>
       <View style={styles.perfilRowIcon}>
@@ -667,6 +738,8 @@ function TabBarItem({
   badgeColor?: string;
   onPress:     () => void;
 }) {
+  const C = useScreenColors();
+  const styles = makeStyles(C);
   const activeIcon = icon.replace('-outline', '') as keyof typeof Ionicons.glyphMap;
   return (
     <TouchableOpacity style={styles.tabItem} activeOpacity={0.7} onPress={onPress}>
@@ -689,8 +762,8 @@ function TabBarItem({
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.headerDark },
+const makeStyles = (C: ScreenColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.header },
 
   // ── Header
   header: {
@@ -722,9 +795,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderColor: 'rgba(255,255,255,0.3)',
   },
-  disponibleDot:   { width: 8, height: 8, borderRadius: 4, backgroundColor: C.green },
+  disponibleDot:   { width: 8, height: 8, borderRadius: 4, backgroundColor: C.greenDark },
   noDisponibleDot: { backgroundColor: 'rgba(255,255,255,0.5)' },
-  disponibleText:  { fontSize: 13, fontWeight: '700', color: C.green },
+  disponibleText:  { fontSize: 13, fontWeight: '700', color: C.greenDark },
   noDisponibleText:{ color: 'rgba(255,255,255,0.6)' },
 
   // ── Body & Scroll
@@ -739,13 +812,12 @@ const styles = StyleSheet.create({
   // ── Resumen
   summaryRow: { flexDirection: 'row', gap: 10 },
   summaryCard: {
-    backgroundColor: C.white, borderRadius: 14, padding: 14,
+    backgroundColor: C.white, borderRadius: 16, padding: 14,
     alignItems: 'center', gap: 5,
     borderWidth: 1.5, borderColor: C.amberBorder,
-    shadowColor: C.header, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 6, elevation: 2,
+    ...cardShadow(C, C.header),
   },
-  summaryCardAmber: { backgroundColor: C.amberFaint },
+  summaryCardHeader: { backgroundColor: C.header, borderColor: C.header },
   summaryValue:     { fontSize: 22, fontWeight: '800', color: C.text },
   summaryLabel:     { fontSize: 11, color: C.textSoft, fontWeight: '600', textAlign: 'center' },
 
@@ -754,8 +826,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.white, borderRadius: 18,
     padding: 16, gap: 10,
     borderWidth: 1.5, borderColor: C.amberBorder,
-    shadowColor: C.header, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+    ...cardShadow(C, C.header),
   },
   deliveryCardOrange: { borderColor: C.orange, backgroundColor: '#FFFBF5' },
   deliveryCardGreen:  { borderColor: C.greenDark, backgroundColor: C.greenFaint },
@@ -808,7 +879,7 @@ const styles = StyleSheet.create({
 
   confirmarBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: C.greenDark, borderRadius: 12, paddingVertical: 13,
+    gap: 8, backgroundColor: C.header, borderRadius: 12, paddingVertical: 13,
   },
   confirmarBtnText: { fontSize: 15, fontWeight: '700', color: C.white },
 
@@ -885,19 +956,18 @@ const styles = StyleSheet.create({
   weekCard: {
     backgroundColor: C.white, borderRadius: 20, padding: 20,
     borderWidth: 1.5, borderColor: C.amberBorder, gap: 6,
-    shadowColor: C.header, shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
+    ...cardShadow(C, C.header),
   },
   weekCardLabel:    { fontSize: 13, color: C.textSoft, fontWeight: '600' },
-  weekCardAmount:   { fontSize: 44, fontWeight: '800', color: C.green, letterSpacing: -1 },
+  weekCardAmount:   { fontSize: 44, fontWeight: '800', color: C.header, letterSpacing: -1 },
   weekCardStats:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  weekCardStatText: { fontSize: 13, color: C.greenDark, fontWeight: '600' },
+  weekCardStatText: { fontSize: 13, color: C.header, fontWeight: '600' },
   payRow:     { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  payText:    { fontSize: 13, color: C.greenDark, fontWeight: '600' },
+  payText:    { fontSize: 13, color: C.header, fontWeight: '600' },
   progressTrack: {
-    height: 7, backgroundColor: C.amberFaint, borderRadius: 4, overflow: 'hidden', marginTop: 4,
+    height: 7, backgroundColor: C.headerFaint, borderRadius: 4, overflow: 'hidden', marginTop: 4,
   },
-  progressFill:  { height: '100%', backgroundColor: C.green, borderRadius: 4 },
+  progressFill:  { height: '100%', backgroundColor: C.header, borderRadius: 4 },
   progressLabel: { fontSize: 11, color: C.textSoft },
 
   tarifaCard: {
@@ -909,7 +979,7 @@ const styles = StyleSheet.create({
     gap: 12, padding: 16,
   },
   formulaChip: {
-    backgroundColor: C.amberFaint, borderRadius: 12,
+    backgroundColor: C.headerFaint, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center', gap: 2,
   },
   formulaLabel: { fontSize: 10, color: C.textSoft, fontWeight: '600', textTransform: 'uppercase' },
@@ -917,38 +987,42 @@ const styles = StyleSheet.create({
   exRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 11,
-    borderTopWidth: 1, borderTopColor: C.amberFaint,
+    borderTopWidth: 1, borderTopColor: C.headerFaint,
     gap: 10,
   },
   kmBadge: {
-    backgroundColor: C.amberLight, borderRadius: 8,
+    backgroundColor: C.headerFaint, borderRadius: 8,
     paddingHorizontal: 8, paddingVertical: 3, minWidth: 50, alignItems: 'center',
   },
   kmBadgeText: { fontSize: 13, fontWeight: '800', color: C.headerDark },
   exLabel:     { flex: 1, fontSize: 13, color: C.textMid },
-  exEarning:   { fontSize: 14, fontWeight: '800', color: C.greenDark },
+  exEarning:   { fontSize: 14, fontWeight: '800', color: C.header },
 
   // ── Perfil
   perfilAvatarWrapper: { alignItems: 'center', gap: 8, paddingVertical: 8 },
   perfilAvatar: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: C.amberFaint, borderWidth: 3, borderColor: C.amberBorder,
+    backgroundColor: C.headerFaint, borderWidth: 3, borderColor: C.amberBorder,
     alignItems: 'center', justifyContent: 'center',
   },
   perfilAvatarEmoji: { fontSize: 38 },
+  avatarEditBadge: {
+    position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: 13,
+    backgroundColor: C.header, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: C.bg,
+  },
   perfilName:        { fontSize: 22, fontWeight: '800', color: C.text },
   perfilRolePill: {
-    backgroundColor: C.amberFaint, borderRadius: 12,
+    backgroundColor: C.headerFaint, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 4,
     borderWidth: 1, borderColor: C.amberBorder,
   },
   perfilRoleText: { fontSize: 13, fontWeight: '700', color: C.header },
 
   perfilCard: {
-    backgroundColor: C.white, borderRadius: 16, paddingHorizontal: 4,
+    backgroundColor: C.white, borderRadius: 18, paddingHorizontal: 4,
     borderWidth: 1.5, borderColor: C.amberBorder, overflow: 'hidden',
-    shadowColor: C.header, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 6, elevation: 2,
+    ...cardShadow(C, C.header),
   },
   perfilRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -956,7 +1030,7 @@ const styles = StyleSheet.create({
   },
   perfilRowIcon: {
     width: 36, height: 36, borderRadius: 10,
-    backgroundColor: C.amberFaint, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.headerFaint, alignItems: 'center', justifyContent: 'center',
   },
   perfilRowLabel: { flex: 1, fontSize: 14, color: C.textSoft },
   perfilRowValue: { fontSize: 14, fontWeight: '700', color: C.text },
@@ -968,6 +1042,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF5F5', marginTop: 4,
   },
   logoutText: { fontSize: 15, fontWeight: '700', color: '#E74C3C' },
+
+  // ── Empty state
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
+  emptyStateText: { fontSize: 15, fontWeight: '600', color: C.textSoft },
 
   // ── Bottom tab bar
   tabBar: {

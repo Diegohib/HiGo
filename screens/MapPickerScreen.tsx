@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect } from 'react';
 import {
   StyleSheet,
-  Text,
   View,
   TouchableOpacity,
   SafeAreaView,
@@ -9,10 +11,11 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
+import Text from '../components/Text';
 import MapView, { Region, UrlTile } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HomeStackParamList } from '../navigation/types';
 
@@ -29,6 +32,8 @@ const QUITO: Region = {
 
 export default function MapPickerScreen() {
   const navigation = useNavigation<StackNavigationProp<HomeStackParamList, 'MapPicker'>>();
+  const route      = useRoute<RouteProp<HomeStackParamList, 'MapPicker'>>();
+  const returnTo   = route.params?.returnTo ?? 'Checkout';
   const mapRef     = useRef<MapView>(null);
 
   // Región central actual (se actualiza en onRegionChangeComplete)
@@ -45,7 +50,10 @@ export default function MapPickerScreen() {
     async function goToGPS() {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;              // queda en Quito
+        if (status !== 'granted') {
+          geocodeRegion(QUITO);                         // permiso denegado: resolver dirección de Quito
+          return;
+        }
 
         const pos = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
@@ -92,13 +100,13 @@ export default function MapPickerScreen() {
     try {
       const results  = await Location.reverseGeocodeAsync({ latitude, longitude });
       const resolved = formatAddress(results[0]);
-      navigation.navigate('Checkout', {
+      navigation.navigate(returnTo, {
         pickedAddress: resolved,
         pickedLat:     latitude,
         pickedLng:     longitude,
       });
     } catch {
-      navigation.navigate('Checkout', {
+      navigation.navigate(returnTo, {
         pickedAddress: address,
         pickedLat:     latitude,
         pickedLng:     longitude,
@@ -117,7 +125,7 @@ export default function MapPickerScreen() {
       {/* ── Mapa fullscreen ── */}
       <MapView
         ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         mapType="none"
         initialRegion={QUITO}
         onRegionChange={() => {

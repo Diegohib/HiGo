@@ -18,16 +18,22 @@ export const EARNING_TIERS: EarningTier[] = [
   { label: 'Más de $150',  min: 151, max: null, earning: 6.00 },
 ];
 
-/** Calcula la ganancia del cochero por un pedido según su total. */
-export function calcEarning(orderTotal: number): number {
+/**
+ * Ganancia del cochero por un pedido según lo que valen los productos (sin
+ * gestión ni envío). Se paga del 7 % de gestión: medido sobre los productos,
+ * ese 7 % siempre alcanza para pagarle (con el pedido mínimo de $15).
+ */
+export function calcEarning(productSubtotal: number): number {
   for (const tier of [...EARNING_TIERS].reverse()) {
-    if (orderTotal >= tier.min) return tier.earning;
+    if (productSubtotal >= tier.min) return tier.earning;
   }
   return 0; // pedido menor a $15 (no debería ocurrir)
 }
 
 // ─── Tarifas transportista ────────────────────────────────────────────────────
-// Ganancia por entrega = base fija + tarifa por km recorrido
+// El transportista cobra el envío completo que pagó el cliente (tarifa por
+// vehículo, ver utils/transport.ts) — se guarda en el pedido como
+// shippingCost. Esta fórmula solo queda para pedidos viejos que no lo traen.
 
 export const TRANSPORTISTA_BASE   = 2.00;  // $ por entrega
 export const TRANSPORTISTA_PER_KM = 0.45;  // $ por km adicional

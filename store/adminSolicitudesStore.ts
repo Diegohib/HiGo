@@ -1,6 +1,18 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteField,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+  Timestamp,
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useAuthStore } from './authStore';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -9,6 +21,7 @@ export type SolicitudRole   = 'cochero' | 'transportista' | 'comerciante';
 
 export interface Solicitud {
   id:               string;
+  uid:              string;
   name:             string;
   phone:            string;
   email?:           string;
@@ -16,6 +29,7 @@ export interface Solicitud {
   requestedAt:      Date;
   avatar:           string;
   documents:        string[];
+  photoUris?:       Record<string, string>;
   extraData:        Record<string, string>;
   status:           SolicitudStatus;
   rejectionReason?: string;
@@ -32,126 +46,70 @@ export const REJECTION_REASONS = [
 
 export type RejectionReason = typeof REJECTION_REASONS[number];
 
-// ─── Mock solicitudes ─────────────────────────────────────────────────────────
-
-const MOCK_SOLICITUDES: Solicitud[] = [
-  {
-    id: 's1',
-    name: 'Miguel Ángel Salazar',
-    phone: '+593 98 211 3344',
-    role: 'cochero',
-    requestedAt: new Date('2026-04-17T09:15:00'),
-    avatar: '🚲',
-    documents: ['Foto de cédula', 'Foto de perfil'],
-    extraData: { cedula: '1712345678', numCoche: '012' },
-    status: 'pendiente',
-  },
-  {
-    id: 's2',
-    name: 'Fernanda Castro',
-    phone: '+593 99 455 6677',
-    role: 'transportista',
-    requestedAt: new Date('2026-04-17T11:30:00'),
-    avatar: '🚚',
-    documents: ['Foto de cédula', 'Foto de matrícula', 'Foto de perfil'],
-    extraData: { cedula: '1798765432' },
-    status: 'pendiente',
-  },
-  {
-    id: 's3',
-    name: 'Ramiro Quispe',
-    phone: '+593 96 788 9900',
-    role: 'comerciante',
-    requestedAt: new Date('2026-04-17T14:05:00'),
-    avatar: '🏪',
-    documents: ['Foto de cédula', 'Foto de perfil'],
-    extraData: { cedula: '1756473829', stallNumber: '07', giro: 'Frutas' },
-    status: 'pendiente',
-  },
-  {
-    id: 's4',
-    name: 'Lucía Benítez',
-    phone: '+593 98 333 2211',
-    role: 'cochero',
-    requestedAt: new Date('2026-04-18T08:20:00'),
-    avatar: '🚲',
-    documents: ['Foto de cédula', 'Foto de perfil'],
-    extraData: { cedula: '1734561290', numCoche: '027' },
-    status: 'pendiente',
-  },
-  {
-    id: 's5',
-    name: 'Andrés Pillajo',
-    phone: '+593 99 612 0033',
-    role: 'transportista',
-    requestedAt: new Date('2026-04-18T10:45:00'),
-    avatar: '🚚',
-    documents: ['Foto de cédula', 'Foto de matrícula', 'Foto de perfil'],
-    extraData: { cedula: '1723456781' },
-    status: 'pendiente',
-  },
-  {
-    id: 's6',
-    name: 'Marisol Vega',
-    phone: '+593 97 500 4422',
-    role: 'comerciante',
-    requestedAt: new Date('2026-04-18T13:10:00'),
-    avatar: '🏪',
-    documents: ['Foto de cédula', 'Foto de perfil'],
-    extraData: { cedula: '1745678923', stallNumber: '14', giro: 'Verduras' },
-    status: 'pendiente',
-  },
-];
-
 // ─── Store ────────────────────────────────────────────────────────────────────
+// Las solicitudes ahora viven en Firestore. Solo un admin tiene permiso (según
+// las reglas de seguridad) para leer la colección completa, así que el listener
+// en vivo se activa/desactiva según el rol del usuario autenticado.
 
 interface AdminSolicitudesState {
   solicitudes:       Solicitud[];
-  agregarSolicitud:  (data: Omit<Solicitud, 'id' | 'requestedAt' | 'status'>) => string;
-  aprobar:           (id: string) => void;
-  rechazar:          (id: string, reason: RejectionReason) => void;
+  agregarSolicitud:  (data: Omit<Solicitud, 'id' | 'requestedAt' | 'status'>) => Promise<string>;
+  aprobar:           (id: string) => Promise<void>;
+  rechazar:          (id: string, reason: RejectionReason) => Promise<void>;
 }
 
-export const useAdminSolicitudesStore = create<AdminSolicitudesState>()(
-  persist(
-    (set) => ({
-      solicitudes: MOCK_SOLICITUDES,
+export const useAdminSolicitudesStore = create<AdminSolicitudesState>()((set, get) => ({
+  solicitudes: [],
 
-      agregarSolicitud: (data) => {
-        const id = `sol_${Date.now()}`;
-        set((s) => ({
-          solicitudes: [
-            ...s.solicitudes,
-            { ...data, id, requestedAt: new Date(), status: 'pendiente' },
-          ],
-        }));
-        return id;
-      },
+  agregarSolicitud: async (data) => {
+    const docRef = await addDoc(collection(db, 'solicitudes'), {
+      ...data,
+      requestedAt: serverTimestamp(),
+      status: 'pendiente',
+    });
+    return docRef.id;
+  },
 
-      aprobar: (id) =>
-        set((s) => ({
-          solicitudes: s.solicitudes.map((sol) =>
-            sol.id === id ? { ...sol, status: 'aprobada', rejectionReason: undefined } : sol
-          ),
-        })),
+  aprobar: async (id) => {
+    const sol = get().solicitudes.find((s) => s.id === id);
+    if (!sol) return;
+    await updateDoc(doc(db, 'solicitudes', id), { status: 'aprobada', rejectionReason: deleteField() });
+    await updateDoc(doc(db, 'users', sol.uid), { status: 'approved', rejectionReason: deleteField() });
+  },
 
-      rechazar: (id, reason) =>
-        set((s) => ({
-          solicitudes: s.solicitudes.map((sol) =>
-            sol.id === id ? { ...sol, status: 'rechazada', rejectionReason: reason } : sol
-          ),
-        })),
-    }),
-    {
-      name: 'higo-solicitudes',
-      storage: createJSONStorage(() => AsyncStorage, {
-        reviver: (key, value) => {
-          if (key === 'requestedAt' && typeof value === 'string') {
-            return new Date(value);
-          }
-          return value;
-        },
-      }),
-    }
-  )
-);
+  rechazar: async (id, reason) => {
+    const sol = get().solicitudes.find((s) => s.id === id);
+    if (!sol) return;
+    await updateDoc(doc(db, 'solicitudes', id), { status: 'rechazada', rejectionReason: reason });
+    await updateDoc(doc(db, 'users', sol.uid), { status: 'rejected', rejectionReason: reason });
+  },
+}));
+
+// ─── Suscripción en vivo (solo admin) ──────────────────────────────────────────
+
+let unsubSolicitudes: (() => void) | null = null;
+
+useAuthStore.subscribe((state) => {
+  const isAdmin = state.user?.role === 'admin' && state.user.status === 'approved';
+
+  if (isAdmin && !unsubSolicitudes) {
+    unsubSolicitudes = onSnapshot(
+      query(collection(db, 'solicitudes'), orderBy('requestedAt', 'desc')),
+      (snap) => {
+        const solicitudes = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            ...data,
+            id: d.id,
+            requestedAt: (data.requestedAt as Timestamp | undefined)?.toDate() ?? new Date(),
+          } as Solicitud;
+        });
+        useAdminSolicitudesStore.setState({ solicitudes });
+      }
+    );
+  } else if (!isAdmin && unsubSolicitudes) {
+    unsubSolicitudes();
+    unsubSolicitudes = null;
+    useAdminSolicitudesStore.setState({ solicitudes: [] });
+  }
+});

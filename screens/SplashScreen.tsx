@@ -1,36 +1,49 @@
-import { StyleSheet, Text, View, TouchableOpacity, Pressable } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { StyleSheet, View, Animated, Easing } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
+import { resolveRoute } from '../navigation/resolveRoute';
+import { useAuthStore } from '../store/authStore';
+import { HiGoMark } from '../components/HiGoLogo';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'Splash'>;
 };
 
+// Cortina de arranque: solo el logo, un instante, siempre — haya o no sesión
+// iniciada — y después pasa al destino que corresponda (catálogo si es
+// invitado, o directo al dashboard de su rol si ya inició sesión). No es una
+// pantalla de decisión con botones — eso ya vive en la pestaña Cuenta para
+// quien busca acceso operativo.
+
+const MIN_VISIBLE_MS = 1400;
+
 export default function SplashScreen({ navigation }: Props) {
+  const pulse = useRef(new Animated.Value(1)).current;
+  const user = useAuthStore((s) => s.user);
+  const emailVerified = useAuthStore((s) => s.emailVerified);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.92, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1,    duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+
+    const timer = setTimeout(() => {
+      navigation.reset({ index: 0, routes: [{ name: resolveRoute(user, emailVerified) }] });
+    }, MIN_VISIBLE_MS);
+
+    return () => { loop.stop(); clearTimeout(timer); };
+  }, []);
+
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.logo}>HiGo</Text>
-        <Text style={styles.tagline}>El mercado mayorista para toda la ciudad</Text>
-      </View>
-
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.enterButton}
-          activeOpacity={0.85}
-          onPress={() => navigation.navigate('MainTabs')}
-        >
-          <Text style={styles.enterButtonText}>Entrar al Mercado</Text>
-          <Text style={styles.arrow}>→</Text>
-        </TouchableOpacity>
-
-        <Pressable
-          style={({ pressed }) => [styles.operativeLinkWrapper, pressed && { opacity: 0.6 }]}
-          onPress={() => navigation.navigate('Login')}
-        >
-          <Text style={styles.operativeLink}>Acceso para personal operativo</Text>
-        </Pressable>
-      </View>
+      <Animated.View style={{ transform: [{ scale: pulse }] }}>
+        <HiGoMark size={148} color="#FFFFFF" />
+      </Animated.View>
     </View>
   );
 }
@@ -38,63 +51,8 @@ export default function SplashScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#3D1F8B',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 80,
-    paddingHorizontal: 32,
-  },
-  content: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  logo: {
-    fontSize: 72,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 2,
-    marginBottom: 16,
-  },
-  tagline: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    opacity: 0.9,
-    lineHeight: 26,
-  },
-  actions: {
-    width: '100%',
-    alignItems: 'center',
-    gap: 20,
-  },
-  enterButton: {
-    backgroundColor: '#2ECC71',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    paddingVertical: 18,
-    borderRadius: 14,
-    gap: 10,
-  },
-  enterButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  arrow: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  operativeLinkWrapper: {
-    paddingVertical: 8,
-  },
-  operativeLink: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    opacity: 0.75,
-    textDecorationLine: 'underline',
+    backgroundColor: '#301566',
   },
 });
