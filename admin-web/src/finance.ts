@@ -2,7 +2,7 @@ import { Order } from './types';
 import { startOfWeek } from './utils';
 
 // ─── Finanzas reales por semana ───────────────────────────────────────────────
-// Mismo cálculo que utils/finance.ts de la app (mantener los dos iguales):
+// Reparto de cada pedido entregado:
 //   comerciantes   → el precio de los productos (subtotal)
 //   transportistas → el envío completo (shippingCost)
 //   cocheros       → la tabla de $1–$6 sobre el subtotal, pagada del 7 %

@@ -16,10 +16,7 @@ import RoleSelectionScreen from '../screens/RoleSelectionScreen';
 import StaffRegisterScreen from '../screens/StaffRegisterScreen';
 import CocheroDashboardScreen         from '../screens/CocheroDashboardScreen';
 import TransportistaDashboardScreen  from '../screens/TransportistaDashboardScreen';
-import AdminPayScreen                from '../screens/AdminPayScreen';
-import AdminSolicitudesScreen       from '../screens/AdminSolicitudesScreen';
-import AdminFinanzasScreen          from '../screens/AdminFinanzasScreen';
-import AdminProductosScreen         from '../screens/AdminProductosScreen';
+import AdminWebScreen                from '../screens/AdminWebScreen';
 import ComercianteDashboardScreen    from '../screens/ComercianteDashboardScreen';
 import SolicitudPendienteScreen      from '../screens/SolicitudPendienteScreen';
 import ChatScreen                    from '../screens/ChatScreen';
@@ -128,24 +125,10 @@ export default function AppNavigator() {
           component={TransportistaDashboardScreen}
           options={{ headerShown: false }}
         />
+        {/* Admin: la administración está en el panel web */}
         <Stack.Screen
           name="AdminDashboard"
-          component={AdminPayScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="AdminSolicitudes"
-          component={AdminSolicitudesScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="AdminFinanzas"
-          component={AdminFinanzasScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="AdminProductos"
-          component={AdminProductosScreen}
+          component={AdminWebScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen

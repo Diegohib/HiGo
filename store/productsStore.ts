@@ -101,7 +101,7 @@ onSnapshot(collection(db, 'products'), (snap) => {
 // instalado, o antes de correr "seedInitialCatalog" desde el admin), se
 // muestran los rubros de arranque como vitrina — así el catálogo siempre
 // tiene su estructura visible aunque todavía no haya un solo producto
-// cargado. A propósito NO se usa este helper en AdminProductosScreen: ahí se
+// cargado. A propósito el catálogo del panel web no usa esto: ahí se
 // necesita la lista real (vacía si Firestore está vacío) para saber si hay
 // que ofrecer el botón de importar, y para no editar/borrar categorías que
 // en realidad no existen todavía como documentos.

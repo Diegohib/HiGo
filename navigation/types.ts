@@ -15,11 +15,8 @@ export type RootStackParamList = {
   CocheroDashboard: undefined;
   // Dashboard transportista
   TransportistaDashboard: undefined;
-  // Dashboard admin
+  // Admin: aviso para usar el panel web
   AdminDashboard:       undefined;
-  AdminSolicitudes:     undefined;
-  AdminFinanzas:        undefined;
-  AdminProductos:       undefined;
   // Dashboard comerciante
   ComercianteDashboard: undefined;
   // Asistente de preguntas frecuentes + chat de soporte general

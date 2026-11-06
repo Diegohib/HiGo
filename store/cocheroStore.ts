@@ -1,66 +1,45 @@
-import { create } from 'zustand';
-import { calcEarning, currentWeekDays, isToday, isPast } from '../utils/earnings';
+import { useMemo } from 'react';
+import { calcEarning, currentWeekDays, isToday } from '../utils/earnings';
+import { useCocheroTicketStore } from './cocheroTicketStore';
+import { OrderStatus } from './ordersStore';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+// ─── Ganancias del cochero ────────────────────────────────────────────────────
+// Salen de sus pedidos reales (los "mios" de cocheroTicketStore): cuenta cada
+// pedido que ya terminó de juntar — consolidado, en camino o entregado — de la
+// semana actual. Se usa la fecha del pedido: el cochero lo junta el mismo día.
 
 export interface DayRecord {
   date:        Date;
   ordersCount: number;
-  orderTotals: number[];   // total de cada pedido (para calcular ganancia por tramo)
-  earnings:    number;     // suma de ganancias del día
+  earnings:    number;
 }
 
-// ─── Datos mock: pedidos por posición en la semana (0=Lun … 4=Vie) ───────────
-// Representa una semana real de trabajo. Los días futuros tienen count = 0.
+const DONE: OrderStatus[] = ['consolidado', 'en_camino', 'entregado'];
 
-const MOCK_BY_DOW: { count: number; totals: number[] }[] = [
-  { count: 4, totals: [28.50, 55.00, 18.00, 92.00] }, // Lun
-  { count: 3, totals: [42.00, 35.50, 120.00] },         // Mar
-  { count: 5, totals: [65.00, 22.00, 80.00, 15.00, 50.00] }, // Mié
-  { count: 2, totals: [38.00, 78.50] },                 // Jue
-  { count: 0, totals: [] },                             // Vie (aún no transcurrido)
-];
+export function useCocheroStore() {
+  const mios = useCocheroTicketStore((s) => s.mios);
 
-function buildWeekRecords(): DayRecord[] {
-  const days = currentWeekDays();
-  return days.map((date, idx) => {
-    // Sólo mostrar datos en días pasados o en el día de hoy
-    const hasData = isPast(date) || isToday(date);
-    const mock    = hasData ? MOCK_BY_DOW[idx] : { count: 0, totals: [] };
-    const earnings = mock.totals.reduce((sum, t) => sum + calcEarning(t), 0);
+  return useMemo(() => {
+    const weekRecords: DayRecord[] = currentWeekDays().map((date) => ({ date, ordersCount: 0, earnings: 0 }));
+    const weekStart = weekRecords[0].date.getTime();
+
+    for (const t of mios) {
+      if (!DONE.includes(t.status) || t.createdAt < weekStart) continue;
+      const day = new Date(t.createdAt);
+      day.setHours(0, 0, 0, 0);
+      // Sábado y domingo se suman al viernes: se pagan con esa semana.
+      const rec = weekRecords.find((r) => r.date.getTime() === day.getTime()) ?? weekRecords[4];
+      rec.ordersCount += 1;
+      rec.earnings    += calcEarning(t.productSubtotal);
+    }
+
+    const today = weekRecords.find((r) => isToday(r.date));
     return {
-      date,
-      ordersCount: mock.count,
-      orderTotals: mock.totals,
-      earnings,
+      weekRecords,
+      weeklyEarnings:   weekRecords.reduce((s, r) => s + r.earnings, 0),
+      todayEarnings:    today?.earnings    ?? 0,
+      todayOrdersCount: today?.ordersCount ?? 0,
+      totalOrdersCount: weekRecords.reduce((s, r) => s + r.ordersCount, 0),
     };
-  });
+  }, [mios]);
 }
-
-// ─── Store ────────────────────────────────────────────────────────────────────
-
-interface CocheroState {
-  weekRecords:       DayRecord[];
-  weeklyEarnings:    number;
-  todayEarnings:     number;
-  todayOrdersCount:  number;
-  totalOrdersCount:  number;
-  refreshWeek:       () => void;
-}
-
-export const useCocheroStore = create<CocheroState>((set) => {
-  function compute() {
-    const records       = buildWeekRecords();
-    const today         = records.find(r => isToday(r.date));
-    const weeklyEarnings   = records.reduce((s, r) => s + r.earnings, 0);
-    const todayEarnings    = today?.earnings     ?? 0;
-    const todayOrdersCount = today?.ordersCount  ?? 0;
-    const totalOrdersCount = records.reduce((s, r) => s + r.ordersCount, 0);
-    return { weekRecords: records, weeklyEarnings, todayEarnings, todayOrdersCount, totalOrdersCount };
-  }
-
-  return {
-    ...compute(),
-    refreshWeek: () => set(compute()),
-  };
-});
