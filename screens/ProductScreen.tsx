@@ -154,10 +154,17 @@ export default function ProductScreen({ navigation, route }: Props) {
           </View>
 
           {/* ── Botón agregar al carrito ── */}
-          <TouchableOpacity style={styles.cartButton} activeOpacity={0.85} onPress={handleAddToCart}>
-            <Ionicons name="cart-outline" size={22} color="#FFFFFF" />
-            <Text style={styles.cartButtonText}>Agregar al carrito</Text>
-          </TouchableOpacity>
+          {product.agotado ? (
+            <View style={[styles.cartButton, styles.cartButtonDisabled]}>
+              <Ionicons name="close-circle-outline" size={22} color="#FFFFFF" />
+              <Text style={styles.cartButtonText}>Agotado por hoy</Text>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.cartButton} activeOpacity={0.85} onPress={handleAddToCart}>
+              <Ionicons name="cart-outline" size={22} color="#FFFFFF" />
+              <Text style={styles.cartButtonText}>Agregar al carrito</Text>
+            </TouchableOpacity>
+          )}
 
         </View>
       </ScrollView>
@@ -382,6 +389,11 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 18,
     ...floatingShadow(C, C.success),
+  },
+  cartButtonDisabled: {
+    backgroundColor: C.textFaint,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   cartButtonText: {
     color: '#FFFFFF',

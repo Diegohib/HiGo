@@ -260,7 +260,9 @@ export default function HomeScreen({ navigation }: Props) {
                       </View>
                     </View>
                     <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-                    {base && (
+                    {product.agotado ? (
+                      <Text style={[styles.productPrice, { color: C.danger }]}>Agotado por hoy</Text>
+                    ) : base && (
                       <Text style={styles.productPrice}>
                         ${base.price.toFixed(2)}
                         <Text style={styles.productUnit}> / {base.label}</Text>

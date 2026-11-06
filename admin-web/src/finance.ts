@@ -90,7 +90,7 @@ export function buildWeeks(orders: Order[], count = 8): WeekFinance[] {
       higoGross: round(higoGross),
       higoNet: round(higoGross - toCocheros),
       ordersCount: delivered.length,
-      inProgressCount: ofWeek.length - delivered.length,
+      inProgressCount: ofWeek.filter((o) => o.status !== 'entregado' && o.status !== 'cancelado').length,
       legacyCount,
       cashCollected: round(cashCollected),
       current: i === 0,

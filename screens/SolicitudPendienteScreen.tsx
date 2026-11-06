@@ -80,17 +80,24 @@ export default function SolicitudPendienteScreen({ navigation, route }: Props) {
       orderBy('requestedAt', 'desc'),
       limit(1)
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const d = snap.docs[0];
-      if (!d) { setSol(null); setLoading(false); return; }
-      const data = d.data();
-      setSol({
-        ...data,
-        id: d.id,
-        requestedAt: (data.requestedAt as Timestamp | undefined)?.toDate() ?? new Date(),
-      } as Solicitud);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const d = snap.docs[0];
+        if (!d) { setSol(null); setLoading(false); return; }
+        const data = d.data();
+        setSol({
+          ...data,
+          id: d.id,
+          requestedAt: (data.requestedAt as Timestamp | undefined)?.toDate() ?? new Date(),
+        } as Solicitud);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('[SolicitudPendiente] solicitudes listener error:', error.code, error.message);
+        setLoading(false);
+      }
+    );
     return unsub;
   }, [authUser?.uid]);
 

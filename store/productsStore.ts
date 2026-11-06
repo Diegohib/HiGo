@@ -83,18 +83,30 @@ export const useProductsStore = create<ProductsState>()(() => ({
 
 // ─── Suscripción en vivo ────────────────────────────────────────────────────
 // Pública — no depende de la sesión, así que se activa una sola vez al
-// cargar el módulo (a diferencia de adminSolicitudesStore, que sí depende
-// del rol de quien esté logueado).
+// cargar el módulo (a diferencia de ordersStore, que sí depende
+// de quien esté logueado).
 
-onSnapshot(collection(db, 'categories'), (snap) => {
-  const categories = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Category));
-  useProductsStore.setState({ categories });
-});
+onSnapshot(
+  collection(db, 'categories'),
+  (snap) => {
+    const categories = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Category));
+    useProductsStore.setState({ categories });
+  },
+  (error) => console.error('[productsStore] categories listener error:', error.code, error.message),
+);
 
-onSnapshot(collection(db, 'products'), (snap) => {
-  const products = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
-  useProductsStore.setState({ products, loaded: true });
-});
+// Si falla, igual se marca loaded para no dejar el catálogo cargando para siempre.
+onSnapshot(
+  collection(db, 'products'),
+  (snap) => {
+    const products = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+    useProductsStore.setState({ products, loaded: true });
+  },
+  (error) => {
+    console.error('[productsStore] products listener error:', error.code, error.message);
+    useProductsStore.setState({ loaded: true });
+  },
+);
 
 // ─── Categorías para mostrar (Home, Catálogo) ──────────────────────────────
 // Mientras nadie haya cargado categorías reales a Firestore (recién

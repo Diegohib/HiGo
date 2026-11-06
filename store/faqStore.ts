@@ -47,9 +47,14 @@ export const useFaqStore = create<FaqState>()(() => ({
   },
 }));
 
-onSnapshot(collection(db, 'faqs'), (snap) => {
-  useFaqStore.setState({ faqs: snap.docs.map((d) => toFaq(d.id, d.data())), loaded: true });
-});
+onSnapshot(
+  collection(db, 'faqs'),
+  (snap) => useFaqStore.setState({ faqs: snap.docs.map((d) => toFaq(d.id, d.data())), loaded: true }),
+  (error) => {
+    console.error('[faqStore] faqs listener error:', error.code, error.message);
+    useFaqStore.setState({ loaded: true });
+  },
+);
 
 // Normaliza (minúsculas, sin tildes, sin puntuación) para que "¿Cómo...?" y
 // "como" matcheen igual. Sin la limpieza de puntuación, "¿como" (pegado al

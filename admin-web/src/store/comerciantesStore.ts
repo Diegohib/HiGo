@@ -48,6 +48,10 @@ function syncAuth(state: { user: unknown }) {
           })
           .sort((a, b) => a.stallNumber.localeCompare(b.stallNumber, 'es', { numeric: true }));
         useComerciantesStore.setState({ comerciantes, loaded: true });
+      },
+      (error) => {
+        console.error('[comerciantesStore] listener error:', error.code, error.message);
+        useComerciantesStore.setState({ loaded: true });
       }
     );
   } else if (!isAdmin && unsub) {

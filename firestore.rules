@@ -46,9 +46,9 @@ service cloud.firestore {
       allow update: if isAdmin();
     }
 
-    // Pedidos de clientes. El cliente crea y lee los suyos, pero no los puede
-    // modificar después (ni el estado ni el total). Un admin lee y actualiza
-    // todos. Además:
+    // Pedidos de clientes. El cliente crea y lee los suyos; después solo puede
+    // cancelarlo, y solo mientras ningún cochero lo haya tomado (nunca tocar
+    // el total ni el pago). Un admin lee y actualiza todos. Además:
     //  - un cochero aprobado ve los pedidos de ruta 'cochero' (programada);
     //    reclama uno libre en 'recibido' (operatorUid pasa de '' a su uid) y
     //    después sigue el suyo.
@@ -87,10 +87,21 @@ service cloud.firestore {
         );
       allow update: if isAdmin() ||
         (
+          isSignedIn() &&
+          resource.data.uid == request.auth.uid &&
+          resource.data.status == 'recibido' &&
+          resource.data.operatorUid == '' &&
+          request.resource.data.status == 'cancelado' &&
+          request.resource.data.cancelledBy == 'cliente' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'cancelledAt', 'cancelledBy'])
+        ) ||
+        (
           isApprovedOperator('cochero') &&
           resource.data.operatorRole == 'cochero' &&
+          request.resource.data.status != 'cancelado' &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['operatorUid', 'operatorName', 'operatorPhone', 'status']) &&
+            .hasOnly(['operatorUid', 'operatorName', 'operatorPhone', 'status', 'consolidadoAt']) &&
           (
             resource.data.operatorUid == request.auth.uid ||
             (
@@ -103,8 +114,9 @@ service cloud.firestore {
         ) ||
         (
           isApprovedOperator('transportista') &&
+          request.resource.data.status != 'cancelado' &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['transportistaUid', 'transportistaName', 'transportistaPhone', 'status', 'paymentStatus']) &&
+            .hasOnly(['transportistaUid', 'transportistaName', 'transportistaPhone', 'status', 'paymentStatus', 'deliveredAt']) &&
           // Solo puede tocar el pago para marcar cobrado un efectivo.
           (
             !('paymentStatus' in request.resource.data.diff(resource.data).affectedKeys()) ||
@@ -132,6 +144,7 @@ service cloud.firestore {
     //  - el cochero que reclamó el pedido se anota en ellos y los marca
     //    'retirado' (el cochero trabaja en el mercado: junta todo y se lo pasa
     //    al transportista).
+    //  - el cliente los pasa a 'cancelado' junto con su pedido (mismo batch).
     // getAfter: al reclamar, el pedido y sus tickets se escriben en el mismo
     // batch, así que se mira el pedido como queda después del batch.
     function isPickerOf(orderId) {
@@ -153,6 +166,13 @@ service cloud.firestore {
         request.resource.data.released ==
           getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.released;
       allow update: if isAdmin() ||
+        (
+          isSignedIn() &&
+          resource.data.clientUid == request.auth.uid &&
+          request.resource.data.status == 'cancelado' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+          getAfter(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.status == 'cancelado'
+        ) ||
         (
           isApprovedOperator('comerciante') &&
           resource.data.comercianteUid == request.auth.uid &&

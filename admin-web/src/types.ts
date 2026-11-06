@@ -31,6 +31,8 @@ export type Product = {
   comercianteUid?:  string;
   comercianteName?: string;
   stallNumber?:     string;
+  // Agotado por hoy: se sigue viendo en el catálogo pero no se puede pedir.
+  agotado?:         boolean;
 };
 
 export type Category = {
@@ -75,7 +77,7 @@ export type CartItem = {
   quantity: number;
 };
 
-export type OrderStatus = 'recibido' | 'en_mercado' | 'consolidado' | 'en_camino' | 'entregado';
+export type OrderStatus = 'recibido' | 'en_mercado' | 'consolidado' | 'en_camino' | 'entregado' | 'cancelado';
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   recibido: 'Recibido',
@@ -83,6 +85,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   consolidado: 'Consolidado',
   en_camino: 'En camino',
   entregado: 'Entregado',
+  cancelado: 'Cancelado',
 };
 
 export interface Order {
@@ -112,10 +115,12 @@ export interface Order {
   // Pago (pedidos viejos no lo traen). Transferencia: 'por_verificar' hasta
   // que el admin confirma o rechaza; released recién en true al confirmar.
   paymentMethod?: 'transferencia' | 'efectivo';
-  paymentStatus?: 'por_verificar' | 'verificado' | 'rechazado' | 'contra_entrega' | 'cobrado';
+  // 'reembolsado': transferencia confirmada de un pedido cancelado, ya devuelta.
+  paymentStatus?: 'por_verificar' | 'verificado' | 'rechazado' | 'contra_entrega' | 'cobrado' | 'reembolsado';
   receiptUrl?: string;
   paymentRef?: string;
   released?: boolean;
+  cancelledBy?: 'cliente' | 'admin';
   total: number;
   items: CartItem[];
   createdAt: number;
@@ -127,7 +132,13 @@ export const PAYMENT_STATUS_LABEL: Record<NonNullable<Order['paymentStatus']>, s
   rechazado: 'Pago rechazado',
   contra_entrega: 'Efectivo al entregar',
   cobrado: 'Efectivo cobrado',
+  reembolsado: 'Dinero devuelto',
 };
+
+// Cancelado con la transferencia ya confirmada: hay que devolverle el dinero.
+export function needsRefund(o: Order): boolean {
+  return o.status === 'cancelado' && o.paymentStatus === 'verificado';
+}
 
 // Datos de la cuenta de HiGo para transferencias (documento config/payment).
 export interface BankDetails {

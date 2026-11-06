@@ -42,7 +42,8 @@ export const useChatStore = create<ChatState>()((_set, get) => ({
             } as ChatMessage;
           }),
         });
-      }
+      },
+      (error) => console.error('[chatStore] messages listener error:', error.code, error.message)
     );
 
     const thread = get().threads.find((t) => t.uid === uid);
@@ -98,7 +99,7 @@ function syncAuth(state: { user: unknown }) {
         } as ChatThread;
       });
       useChatStore.setState({ threads });
-    });
+    }, (error) => console.error('[chatStore] threads listener error:', error.code, error.message));
   } else if (!isAdmin && unsubThreads) {
     unsubThreads();
     unsubThreads = null;

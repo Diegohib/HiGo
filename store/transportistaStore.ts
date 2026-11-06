@@ -4,7 +4,8 @@ import { useTransportistaDeliveryStore } from './transportistaDeliveryStore';
 
 // ─── Ganancias del transportista ──────────────────────────────────────────────
 // Salen de sus entregas reales (las "mias" de transportistaDeliveryStore): cada
-// pedido entregado de la semana actual suma el envío que pagó el cliente.
+// pedido entregado de la semana actual suma el envío que pagó el cliente, el
+// día en que se entregó (pedidos viejos: el día del pedido).
 
 export interface DayRecordT {
   date:            Date;
@@ -23,8 +24,9 @@ export function useTransportistaStore() {
     const weekStart = weekRecords[0].date.getTime();
 
     for (const d of mias) {
-      if (d.status !== 'entregado' || d.createdAt < weekStart) continue;
-      const day = new Date(d.createdAt);
+      const at = d.deliveredAt ?? d.createdAt;
+      if (d.status !== 'entregado' || at < weekStart) continue;
+      const day = new Date(at);
       day.setHours(0, 0, 0, 0);
       // Sábado y domingo se suman al viernes: se pagan con esa semana.
       const rec = weekRecords.find((r) => r.date.getTime() === day.getTime()) ?? weekRecords[4];

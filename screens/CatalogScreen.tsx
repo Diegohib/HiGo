@@ -123,10 +123,14 @@ export default function CatalogScreen() {
             {categories.find(c => c.id === item.categoryId)?.name}
           </Text>
         )}
-        <Text style={styles.cardPrice}>
-          ${base.price.toFixed(2)}
-          <Text style={styles.cardUnit}> / {base.label}</Text>
-        </Text>
+        {item.agotado ? (
+          <Text style={[styles.cardPrice, { color: C.danger }]}>Agotado por hoy</Text>
+        ) : (
+          <Text style={styles.cardPrice}>
+            ${base.price.toFixed(2)}
+            <Text style={styles.cardUnit}> / {base.label}</Text>
+          </Text>
+        )}
       </TouchableOpacity>
     );
   }

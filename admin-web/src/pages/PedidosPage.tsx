@@ -1,22 +1,54 @@
 import { useState } from 'react';
 import { useOrdersStore } from '../store/ordersStore';
-import { Order, ORDER_STATUS_LABEL, OrderStatus, PAYMENT_STATUS_LABEL } from '../types';
+import { Order, ORDER_STATUS_LABEL, OrderStatus, PAYMENT_STATUS_LABEL, needsRefund } from '../types';
 
 // 'pagos' = transferencias esperando que el admin revise el comprobante.
-type FilterTab = 'todos' | 'pagos' | OrderStatus;
+// 'devolver' = cancelados con la transferencia ya confirmada.
+type FilterTab = 'todos' | 'pagos' | 'devolver' | OrderStatus;
 
-const TABS: FilterTab[] = ['todos', 'pagos', 'recibido', 'en_mercado', 'consolidado', 'en_camino', 'entregado'];
+const TABS: FilterTab[] = ['todos', 'pagos', 'devolver', 'recibido', 'en_mercado', 'consolidado', 'en_camino', 'entregado', 'cancelado'];
 
 export default function PedidosPage() {
-  const { orders, loaded, hasMore, clientNames, loadMore, confirmarPago, rechazarPago } = useOrdersStore();
+  const { orders, loaded, hasMore, clientNames, loadMore, confirmarPago, rechazarPago, cancelarPedido, marcarReembolsado } = useOrdersStore();
   const [filter, setFilter] = useState<FilterTab>('todos');
   const [busy, setBusy] = useState<string | null>(null);
 
-  const porVerificar = orders.filter((o) => o.paymentStatus === 'por_verificar');
+  const porVerificar = orders.filter((o) => o.paymentStatus === 'por_verificar' && o.status !== 'cancelado');
+  const porDevolver  = orders.filter(needsRefund);
   const visible =
     filter === 'todos' ? orders :
     filter === 'pagos' ? porVerificar :
+    filter === 'devolver' ? porDevolver :
     orders.filter((o) => o.status === filter);
+
+  async function handleCancelar(o: Order) {
+    const msg = o.paymentStatus === 'verificado'
+      ? `¿Cancelar este pedido? Ya pagó ${o.total.toFixed(2)} por transferencia: queda en "Por devolver".`
+      : '¿Cancelar este pedido? Los puestos, el cochero y el transportista dejan de verlo.';
+    if (!confirm(msg)) return;
+    setBusy(o.id);
+    try {
+      await cancelarPedido(o.id);
+    } catch (err) {
+      console.error('[PedidosPage] cancelar:', err);
+      alert('No se pudo cancelar el pedido. Intentá de nuevo.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleReembolso(o: Order) {
+    if (!confirm(`¿Ya le devolviste ${o.total.toFixed(2)} al cliente?`)) return;
+    setBusy(o.id);
+    try {
+      await marcarReembolsado(o.id);
+    } catch (err) {
+      console.error('[PedidosPage] reembolso:', err);
+      alert('No se pudo guardar. Intentá de nuevo.');
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function handlePago(o: Order, accion: 'confirmar' | 'rechazar') {
     const msg = accion === 'confirmar'
@@ -44,14 +76,19 @@ export default function PedidosPage() {
       <div className="tabs">
         {TABS.map((t) => (
           <button key={t} className={`tab-btn${filter === t ? ' active' : ''}`} onClick={() => setFilter(t)}>
-            {t === 'todos' ? 'Todos' : t === 'pagos' ? `Pagos por verificar (${porVerificar.length})` : ORDER_STATUS_LABEL[t]}
+            {t === 'todos' ? 'Todos'
+              : t === 'pagos' ? `Pagos por verificar (${porVerificar.length})`
+              : t === 'devolver' ? `Por devolver (${porDevolver.length})`
+              : ORDER_STATUS_LABEL[t]}
           </button>
         ))}
       </div>
 
       {loaded && visible.length === 0 ? (
         <div className="empty-box">
-          <p className="empty-title">{filter === 'pagos' ? 'No hay pagos por verificar' : 'Sin pedidos'}</p>
+          <p className="empty-title">
+            {filter === 'pagos' ? 'No hay pagos por verificar' : filter === 'devolver' ? 'No hay dinero por devolver' : 'Sin pedidos'}
+          </p>
           <p>Todavía no hay pedidos que coincidan con este filtro.</p>
         </div>
       ) : (
@@ -80,23 +117,26 @@ export default function PedidosPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p className="row-title">${o.total.toFixed(2)}</p>
-                  <span className={`badge badge-${o.status === 'recibido' ? 'pendiente' : 'aprobada'}`}>
+                  <span className={`badge badge-${
+                    o.status === 'cancelado' ? 'rechazada' : o.status === 'recibido' ? 'pendiente' : 'aprobada'
+                  }`}>
                     {ORDER_STATUS_LABEL[o.status]}
+                    {o.status === 'cancelado' && o.cancelledBy && ` por ${o.cancelledBy === 'cliente' ? 'el cliente' : 'admin'}`}
                   </span>
                   {o.paymentStatus && (
                     <div style={{ marginTop: 6 }}>
                       <span className={`badge badge-${
                         o.paymentStatus === 'rechazado' ? 'rechazada' :
-                        o.paymentStatus === 'por_verificar' || o.paymentStatus === 'contra_entrega' ? 'pendiente' : 'aprobada'
+                        o.paymentStatus === 'por_verificar' || o.paymentStatus === 'contra_entrega' || needsRefund(o) ? 'pendiente' : 'aprobada'
                       }`}>
-                        {PAYMENT_STATUS_LABEL[o.paymentStatus]}
+                        {needsRefund(o) ? 'Por devolver' : PAYMENT_STATUS_LABEL[o.paymentStatus]}
                       </span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {o.paymentMethod === 'transferencia' && (o.paymentStatus === 'por_verificar' || o.paymentStatus === 'rechazado') && (
+              {o.status !== 'cancelado' && o.paymentMethod === 'transferencia' && (o.paymentStatus === 'por_verificar' || o.paymentStatus === 'rechazado') && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                   <span className="row-sub">
                     Comprobante N° <strong>{o.paymentRef || '—'}</strong>
@@ -116,6 +156,26 @@ export default function PedidosPage() {
                   )}
                   <button className="btn btn-success btn-sm" disabled={busy === o.id} onClick={() => handlePago(o, 'confirmar')}>
                     {busy === o.id ? 'Guardando…' : 'Confirmar pago'}
+                  </button>
+                </div>
+              )}
+
+              {needsRefund(o) && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <span className="row-sub">
+                    Devolver <strong>${o.total.toFixed(2)}</strong> · comprobante N° {o.paymentRef || '—'}
+                  </span>
+                  <div style={{ flex: 1 }} />
+                  <button className="btn btn-success btn-sm" disabled={busy === o.id} onClick={() => handleReembolso(o)}>
+                    {busy === o.id ? 'Guardando…' : 'Marcar devuelto'}
+                  </button>
+                </div>
+              )}
+
+              {o.status !== 'cancelado' && o.status !== 'entregado' && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <button className="btn btn-ghost btn-sm" disabled={busy === o.id} onClick={() => handleCancelar(o)}>
+                    Cancelar pedido
                   </button>
                 </div>
               )}

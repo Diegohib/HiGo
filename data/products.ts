@@ -25,6 +25,8 @@ export type Product = {
   comercianteUid?:  string;
   comercianteName?: string;
   stallNumber?:     string;
+  // Agotado por hoy: se sigue viendo en el catálogo pero no se puede pedir.
+  agotado?:         boolean;
 };
 
 export type Category = {

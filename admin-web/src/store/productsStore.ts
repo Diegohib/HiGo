@@ -55,15 +55,26 @@ export const useProductsStore = create<ProductsState>()(() => ({
   },
 }));
 
-onSnapshot(collection(db, 'products'), (snap) => {
-  useProductsStore.setState({
-    products: snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Product, 'id'>) })),
-    loaded: true,
-  });
-});
+onSnapshot(
+  collection(db, 'products'),
+  (snap) => {
+    useProductsStore.setState({
+      products: snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Product, 'id'>) })),
+      loaded: true,
+    });
+  },
+  (error) => {
+    console.error('[productsStore] products listener error:', error.code, error.message);
+    useProductsStore.setState({ loaded: true });
+  },
+);
 
-onSnapshot(collection(db, 'categories'), (snap) => {
-  useProductsStore.setState({
-    categories: snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Category, 'id'>) })),
-  });
-});
+onSnapshot(
+  collection(db, 'categories'),
+  (snap) => {
+    useProductsStore.setState({
+      categories: snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Category, 'id'>) })),
+    });
+  },
+  (error) => console.error('[productsStore] categories listener error:', error.code, error.message),
+);

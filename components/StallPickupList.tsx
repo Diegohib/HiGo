@@ -22,6 +22,7 @@ const STATUS_META: Record<StallTicketStatus, { label: string; icon: keyof typeof
   pendiente: { label: 'Preparando', icon: 'time-outline' },
   listo:     { label: 'Listo',      icon: 'checkmark-circle-outline' },
   retirado:  { label: 'Retirado',   icon: 'checkmark-done' },
+  cancelado: { label: 'Cancelado',  icon: 'close-circle-outline' },
 };
 
 export default function StallPickupList({

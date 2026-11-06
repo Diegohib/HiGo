@@ -57,9 +57,13 @@ export default function CarritoScreen() {
         <View style={styles.rowInfo}>
           <Text style={styles.rowName} numberOfLines={2}>{product.name}</Text>
           <Text style={styles.rowPresentation}>{item.presentationLabel}</Text>
-          <Text style={styles.rowPrice}>
-            ${(item.presentationPrice * item.quantity).toFixed(2)}
-          </Text>
+          {product.agotado ? (
+            <Text style={[styles.rowPrice, { color: C.danger }]}>Agotado por hoy · quitalo para seguir</Text>
+          ) : (
+            <Text style={styles.rowPrice}>
+              ${(item.presentationPrice * item.quantity).toFixed(2)}
+            </Text>
+          )}
         </View>
 
         <View style={styles.rowActions}>

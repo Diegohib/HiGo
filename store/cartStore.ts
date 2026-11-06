@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useProductsStore } from './productsStore';
 
 export type CartItem = {
   productId: string;
@@ -31,6 +32,7 @@ export const useCartStore = create<CartStore>()(
       totalItems: 0,
 
       addItem: ({ productId, presentationIndex, presentationLabel, presentationPrice, quantity = 1 }) => {
+        if (useProductsStore.getState().products.find(p => p.id === productId)?.agotado) return;
         const key = itemKey(productId, presentationIndex);
         const existing = get().items.find(
           i => itemKey(i.productId, i.presentationIndex) === key,
@@ -79,3 +81,30 @@ export const useCartStore = create<CartStore>()(
     }
   )
 );
+
+// El precio cambia día a día en el mercado: cada vez que el catálogo cambia, las
+// líneas del carrito toman el precio actual de su presentación (así el cliente
+// nunca paga un precio viejo guardado de otro día).
+function syncPrices() {
+  const products = useProductsStore.getState().products;
+  if (products.length === 0) return;
+  const items = useCartStore.getState().items;
+  let changed = false;
+  const next = items.map(i => {
+    const pres = products.find(p => p.id === i.productId)?.presentations[i.presentationIndex];
+    if (!pres || (pres.price === i.presentationPrice && pres.label === i.presentationLabel)) return i;
+    changed = true;
+    return { ...i, presentationPrice: pres.price, presentationLabel: pres.label };
+  });
+  if (changed) useCartStore.setState({ items: next });
+}
+
+useProductsStore.subscribe((s, prev) => { if (s.products !== prev.products) syncPrices(); });
+useCartStore.persist.onFinishHydration(syncPrices);
+
+/** Productos del carrito que hoy están agotados. */
+export function useAgotadosEnCarrito() {
+  const items = useCartStore(s => s.items);
+  const products = useProductsStore(s => s.products);
+  return products.filter(p => p.agotado && items.some(i => i.productId === p.id));
+}

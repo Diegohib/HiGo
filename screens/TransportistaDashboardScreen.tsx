@@ -683,6 +683,10 @@ function PerfilTab({ onLogout }: { onLogout: () => void }) {
         <View style={styles.cardDivider} />
         <PerfilRow icon="card-outline"      label="Cédula"     value={user?.cedula ?? '—'} />
         <View style={styles.cardDivider} />
+        <PerfilRow icon="car-outline"       label="Vehículo"   value={user?.vehiculo || '—'} />
+        <View style={styles.cardDivider} />
+        <PerfilRow icon="document-text-outline" label="Placa"  value={user?.placa || '—'} />
+        <View style={styles.cardDivider} />
         <PerfilRow icon="shield-checkmark-outline" label="Estado" value="Verificado" valueColor={C.greenDark} />
       </View>
 

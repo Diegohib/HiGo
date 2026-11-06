@@ -24,6 +24,8 @@ export interface Ticket {
   // desglose usan el total.
   productSubtotal: number;
   items: CartItem[];
+  // Cuándo terminó de juntarlo (pedidos viejos no lo traen).
+  consolidadoAt: number | null;
   createdAt: number;
 }
 
@@ -45,6 +47,7 @@ function toTicket(id: string, data: any): Ticket {
     orderTotal: data.total,
     productSubtotal: data.subtotal ?? data.total,
     items: data.items ?? [],
+    consolidadoAt: (data.consolidadoAt as Timestamp | undefined)?.toMillis() ?? null,
     createdAt: (data.createdAt as Timestamp | undefined)?.toMillis() ?? Date.now(),
   };
 }
@@ -100,6 +103,10 @@ useAuthStore.subscribe((state) => {
             (a.deliveryType === 'directa' ? 0 : 1) - (b.deliveryType === 'directa' ? 0 : 1) ||
             a.createdAt - b.createdAt);
         useCocheroTicketStore.setState({ disponibles, loaded: true });
+      },
+      (error) => {
+        console.error('[cocheroTicketStore] disponibles listener error:', error.code, error.message);
+        useCocheroTicketStore.setState({ loaded: true });
       }
     );
 
@@ -110,8 +117,13 @@ useAuthStore.subscribe((state) => {
         orderBy('createdAt', 'desc')
       ),
       (snap) => {
-        useCocheroTicketStore.setState({ mios: snap.docs.map((d) => toTicket(d.id, d.data())) });
-      }
+        // Si el admin cancela un pedido ya tomado, simplemente desaparece.
+        const mios = snap.docs
+          .filter((d) => d.data().status !== 'cancelado')
+          .map((d) => toTicket(d.id, d.data()));
+        useCocheroTicketStore.setState({ mios });
+      },
+      (error) => console.error('[cocheroTicketStore] mios listener error:', error.code, error.message)
     );
   } else if (!isCochero && unsubDisponibles) {
     unsubDisponibles();

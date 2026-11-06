@@ -36,7 +36,7 @@ type TextField = {
   icon: keyof typeof Ionicons.glyphMap;
   keyboardType?: 'default' | 'phone-pad' | 'number-pad';
   maxLength?: number;
-  autoCapitalize?: 'none' | 'words' | 'sentences';
+  autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters';
 };
 
 type PickerField = {
@@ -89,7 +89,9 @@ const ROLE_CONFIG: Record<StaffRole, RoleConfig> = {
     color: '#3D1F8B',
     accentColor: '#B8A6E8',
     extraFields: [
-      { type: 'text', key: 'cedula', placeholder: 'Número de cédula (10 dígitos)', icon: 'card-outline', keyboardType: 'number-pad', maxLength: 10 },
+      { type: 'text', key: 'cedula',   placeholder: 'Número de cédula (10 dígitos)', icon: 'card-outline', keyboardType: 'number-pad', maxLength: 10 },
+      { type: 'text', key: 'vehiculo', placeholder: 'Ej: Camioneta Chevrolet D-MAX',  icon: 'car-outline',  autoCapitalize: 'words', maxLength: 40 },
+      { type: 'text', key: 'placa',    placeholder: 'Ej: PBA-1234',                   icon: 'document-text-outline', autoCapitalize: 'characters', maxLength: 10 },
     ],
     photoUploads: [
       { key: 'cedula',    label: 'Subir foto de cédula',    icon: 'card-outline'   },
@@ -128,6 +130,8 @@ const FIELD_LABELS: Record<string, string> = {
   cedula:      'Número de cédula',
   numCoche:    'Número de coche',
   stallNumber: 'Número de puesto',
+  vehiculo:    'Vehículo',
+  placa:       'Placa',
 };
 
 // Bajada del encabezado según el rol.
@@ -363,6 +367,8 @@ export default function StaffRegisterScreen({ navigation, route }: Props) {
         cedula:      extraValues.cedula,
         numCoche:    extraValues.numCoche,
         stallNumber: extraValues.stallNumber,
+        vehiculo:    extraValues.vehiculo?.trim(),
+        placa:       extraValues.placa?.trim().toUpperCase(),
         giro:        selectedGiro ?? undefined,
       });
 

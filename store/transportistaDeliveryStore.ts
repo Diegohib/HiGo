@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { collection, doc, onSnapshot, orderBy, query, updateDoc, where, Timestamp } from 'firebase/firestore';
+import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthStore } from './authStore';
 import { CartItem } from './cartStore';
@@ -32,6 +32,8 @@ export interface Delivery {
   lng?:       number;
   // Efectivo contra entrega: lo que hay que cobrarle al cliente (0 si ya pagó).
   cashToCollect: number;
+  // Cuándo se entregó (pedidos viejos no lo traen).
+  deliveredAt: number | null;
   createdAt:  number;
 }
 
@@ -69,6 +71,7 @@ function toDelivery(id: string, data: any): Delivery {
     lat,
     lng,
     cashToCollect: data.paymentMethod === 'efectivo' ? data.total : 0,
+    deliveredAt: (data.deliveredAt as Timestamp | undefined)?.toMillis() ?? null,
     createdAt: (data.createdAt as Timestamp | undefined)?.toMillis() ?? Date.now(),
   };
 }
@@ -97,8 +100,8 @@ export const useTransportistaDeliveryStore = create<TransportistaDeliveryState>(
     if (!mine) return;
     // Efectivo: al entregar, el transportista ya cobró.
     await updateDoc(doc(db, 'orders', id), mine.cashToCollect > 0
-      ? { status: 'entregado', paymentStatus: 'cobrado' }
-      : { status: 'entregado' });
+      ? { status: 'entregado', deliveredAt: serverTimestamp(), paymentStatus: 'cobrado' }
+      : { status: 'entregado', deliveredAt: serverTimestamp() });
   },
 }));
 
@@ -134,7 +137,8 @@ useAuthStore.subscribe((state) => {
         where('transportistaUid', '==', ''),
         orderBy('createdAt', 'asc')
       ),
-      (snap) => { progList = snap.docs.map((d) => toDelivery(d.id, d.data())); pushDisponibles(); }
+      (snap) => { progList = snap.docs.map((d) => toDelivery(d.id, d.data())); pushDisponibles(); },
+      (error) => { console.error('[transportistaDeliveryStore] programada listener error:', error.code, error.message); pushDisponibles(); }
     );
 
     unsubDirecta = onSnapshot(
@@ -145,7 +149,8 @@ useAuthStore.subscribe((state) => {
         where('transportistaUid', '==', ''),
         orderBy('createdAt', 'asc')
       ),
-      (snap) => { dirList = snap.docs.map((d) => toDelivery(d.id, d.data())); pushDisponibles(); }
+      (snap) => { dirList = snap.docs.map((d) => toDelivery(d.id, d.data())); pushDisponibles(); },
+      (error) => { console.error('[transportistaDeliveryStore] directa listener error:', error.code, error.message); pushDisponibles(); }
     );
 
     unsubMias = onSnapshot(
@@ -155,8 +160,13 @@ useAuthStore.subscribe((state) => {
         orderBy('createdAt', 'desc')
       ),
       (snap) => {
-        useTransportistaDeliveryStore.setState({ mias: snap.docs.map((d) => toDelivery(d.id, d.data())) });
-      }
+        // Si el admin cancela un pedido ya tomado, simplemente desaparece.
+        const mias = snap.docs
+          .filter((d) => d.data().status !== 'cancelado')
+          .map((d) => toDelivery(d.id, d.data()));
+        useTransportistaDeliveryStore.setState({ mias });
+      },
+      (error) => console.error('[transportistaDeliveryStore] mias listener error:', error.code, error.message)
     );
   } else if (!isTransportista && unsubProgramada) {
     unsubProgramada(); unsubDirecta?.(); unsubMias?.();

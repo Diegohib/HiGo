@@ -38,9 +38,11 @@ export const useChatStore = create<ChatState>()((set) => ({
       collection(db, 'supportChats', auth.currentUser.uid, 'messages'),
       orderBy('createdAt', 'asc')
     );
-    return onSnapshot(q, (snap) => {
-      set({ messages: snap.docs.map((d) => toMessage(d.id, d.data())) });
-    });
+    return onSnapshot(
+      q,
+      (snap) => set({ messages: snap.docs.map((d) => toMessage(d.id, d.data())) }),
+      (error) => console.error('[chatStore] messages listener error:', error.code, error.message),
+    );
   },
 
   sendMessage: async (text) => {

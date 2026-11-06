@@ -22,7 +22,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HomeStackParamList } from '../navigation/types';
 import { RootStackParamList } from '../navigation/types';
-import { useCartStore } from '../store/cartStore';
+import { useCartStore, useAgotadosEnCarrito } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
 import { useOrdersStore, PaymentMethod, CASH_LIMIT } from '../store/ordersStore';
 import { usePaymentConfig } from '../store/paymentConfigStore';
@@ -57,6 +57,7 @@ export default function CheckoutScreen() {
   const user          = useAuthStore((s) => s.user);
   const isRegistered  = user !== null;
   const { clearCart } = useCartStore();
+  const agotados = useAgotadosEnCarrito();
   const createOrder   = useOrdersStore((s) => s.createOrder);
   const [confirming, setConfirming] = useState(false);
 
@@ -140,6 +141,13 @@ export default function CheckoutScreen() {
   async function handleConfirm() {
     if (!isRegistered || !user) { setShowModal(true); return; }
     if (!hasMapPin) { return; }
+    if (agotados.length > 0) {
+      Alert.alert(
+        'Hay productos agotados',
+        `${agotados.map(p => p.name).join(', ')} se agotó por hoy. Quitalo del carrito para seguir.`
+      );
+      return;
+    }
     if (total < MINIMUM_ORDER) {
       Alert.alert(
         'Pedido mínimo no alcanzado',

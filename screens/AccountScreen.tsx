@@ -54,6 +54,7 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: str
   consolidado: { label: 'Consolidado', color: '#0277BD', bg: '#E1F5FE', icon: 'cube'              },
   en_camino:   { label: 'En camino',   color: '#F9A825', bg: '#FFF8E1', icon: 'bicycle'           },
   entregado:   { label: 'Entregado',   color: '#2E7D32', bg: '#EAFAF1', icon: 'checkmark-circle'  },
+  cancelado:   { label: 'Cancelado',   color: '#C62828', bg: '#FDECEA', icon: 'close-circle'      },
 };
 
 function formatOrderDate(timestamp: number) {

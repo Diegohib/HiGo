@@ -28,9 +28,16 @@ export const useFaqStore = create<FaqState>()(() => ({
   },
 }));
 
-onSnapshot(collection(db, 'faqs'), (snap) => {
-  useFaqStore.setState({
-    faqs: snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Faq, 'id'>) })),
-    loaded: true,
-  });
-});
+onSnapshot(
+  collection(db, 'faqs'),
+  (snap) => {
+    useFaqStore.setState({
+      faqs: snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Faq, 'id'>) })),
+      loaded: true,
+    });
+  },
+  (error) => {
+    console.error('[faqStore] listener error:', error.code, error.message);
+    useFaqStore.setState({ loaded: true });
+  },
+);

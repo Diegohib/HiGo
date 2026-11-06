@@ -1,6 +1,7 @@
 import {
   useEffect,
-  useRef } from 'react';
+  useRef,
+  useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -11,6 +12,8 @@ import {
   Linking,
   Animated,
   Easing,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import Text from '../components/Text';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HomeStackParamList, RootStackParamList } from '../navigation/types';
-import { useOrdersStore, OrderStatus } from '../store/ordersStore';
+import { useOrdersStore, OrderStatus, canClientCancel } from '../store/ordersStore';
 import { useThemeColors } from '../theme/useThemeColors';
 import { ThemeColors } from '../theme/colors';
 
@@ -67,6 +70,8 @@ export default function OrderTrackingScreen() {
   const { orderId } = route.params;
 
   const order = useOrdersStore((s) => s.orders.find((o) => o.id === orderId));
+  const cancelOrder = useOrdersStore((s) => s.cancelOrder);
+  const [cancelling, setCancelling] = useState(false);
 
   // El pedido avanza solo por acciones reales: el cochero lo reclama y
   // consolida (store/cocheroTicketStore.ts), y el transportista lo pone en
@@ -115,7 +120,9 @@ export default function OrderTrackingScreen() {
   const currentStep  = steps[currentIndex];
   const isEnCamino    = currentStatus === 'en_camino';
   const isEntregado   = currentStatus === 'entregado';
-  const badgeColor    = isEntregado ? C.success : C.primary;
+  const isCancelado   = currentStatus === 'cancelado';
+  const badgeColor    = isEntregado ? C.success : isCancelado ? C.danger : C.primary;
+  const canCancel     = canClientCancel(order);
 
   // Qué operativo mostrar: el cochero mientras el pedido está en el mercado o
   // consolidándose; el transportista una vez que el pedido va en camino (o
@@ -135,6 +142,16 @@ export default function OrderTrackingScreen() {
 
   // Aviso de pago: solo cuando hay algo que el cliente tenga que saber.
   const payment =
+    isCancelado ? (
+      order.paymentStatus === 'verificado' ? {
+        icon: 'cash-outline' as const, color: C.warning,
+        text: `Te vamos a devolver ${order.total.toFixed(2)} a la cuenta desde la que transferiste.`,
+      } :
+      order.paymentStatus === 'reembolsado' ? {
+        icon: 'checkmark-circle-outline' as const, color: C.success,
+        text: 'Ya te devolvimos el dinero de la transferencia.',
+      } : null
+    ) :
     order.paymentStatus === 'por_verificar' ? {
       icon: 'time-outline' as const, color: C.warning,
       text: 'Estamos verificando tu transferencia. Tu pedido empieza a prepararse apenas la confirmemos.',
@@ -151,6 +168,33 @@ export default function OrderTrackingScreen() {
       icon: 'checkmark-circle-outline' as const, color: C.success,
       text: 'Pago confirmado.',
     } : null;
+
+  function handleCancel() {
+    Alert.alert(
+      '¿Cancelar el pedido?',
+      order!.paymentStatus === 'verificado'
+        ? 'Te devolvemos el dinero de la transferencia.'
+        : 'Los puestos dejan de prepararlo.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Sí, cancelar',
+          style: 'destructive',
+          onPress: async () => {
+            setCancelling(true);
+            try {
+              await cancelOrder(orderId);
+            } catch (err) {
+              console.error('[OrderTracking] cancel error:', err);
+              Alert.alert('No se pudo cancelar', 'Puede que un cochero ya lo haya tomado. Escribinos por el chat.');
+            } finally {
+              setCancelling(false);
+            }
+          },
+        },
+      ],
+    );
+  }
 
   function handleCall() {
     if (op.phone) Linking.openURL(`tel:${op.phone}`);
@@ -220,13 +264,14 @@ export default function OrderTrackingScreen() {
 
         {/* Badge estado actual — morado mientras avanza, verde al entregar */}
         <View style={[styles.statusBadge, { backgroundColor: badgeColor + '18', borderColor: badgeColor }]}>
-          <Ionicons name={currentStep.icon} size={20} color={badgeColor} />
+          <Ionicons name={isCancelado ? 'close-circle' : currentStep.icon} size={20} color={badgeColor} />
           <Text style={[styles.statusBadgeText, { color: badgeColor }]}>
-            {currentStep.label}
+            {isCancelado ? 'Cancelado' : currentStep.label}
           </Text>
         </View>
 
         {/* Timeline */}
+        {!isCancelado && (
         <View style={styles.timelineCard}>
           {steps.map((step, index) => {
             const isDone    = index < currentIndex;
@@ -291,6 +336,7 @@ export default function OrderTrackingScreen() {
             );
           })}
         </View>
+        )}
 
         {/* Tarjeta de éxito: solo cuando entregado */}
         {isEntregado && (
@@ -304,6 +350,7 @@ export default function OrderTrackingScreen() {
         )}
 
         {/* Tarjeta operador */}
+        {!isCancelado && (
         <View style={styles.operatorCard}>
           <View style={styles.operatorHeader}>
             <View style={styles.operatorAvatar}>
@@ -335,6 +382,16 @@ export default function OrderTrackingScreen() {
             </View>
           )}
         </View>
+        )}
+
+        {canCancel && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={cancelling} activeOpacity={0.85}>
+            {cancelling
+              ? <ActivityIndicator color={C.danger} />
+              : <Ionicons name="close-circle-outline" size={20} color={C.danger} />}
+            <Text style={styles.cancelBtnText}>Cancelar pedido</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Botón rastrear en mapa */}
         {isEnCamino && (
@@ -344,8 +401,8 @@ export default function OrderTrackingScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Botón nuevo pedido: solo cuando entregado */}
-        {isEntregado && (
+        {/* Botón nuevo pedido: cuando ya terminó (entregado o cancelado) */}
+        {(isEntregado || isCancelado) && (
           <TouchableOpacity
             style={styles.newOrderBtn}
             activeOpacity={0.85}
@@ -376,6 +433,19 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     backgroundColor: C.surface,
   },
   paymentBannerText: { flex: 1, fontSize: 13.5, lineHeight: 19, color: C.text },
+  cancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 50,
+    marginBottom: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: C.danger,
+    backgroundColor: C.surface,
+  },
+  cancelBtnText: { fontSize: 15, fontWeight: '700', color: C.danger },
   safe: {
     flex: 1,
     backgroundColor: C.headerGradient[0],

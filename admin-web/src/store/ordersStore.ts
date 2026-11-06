@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthStore } from './authStore';
 import { Order } from '../types';
@@ -14,6 +14,8 @@ interface OrdersState {
   loadMore: () => void;
   confirmarPago: (orderId: string) => Promise<void>;
   rechazarPago: (orderId: string) => Promise<void>;
+  cancelarPedido: (orderId: string) => Promise<void>;
+  marcarReembolsado: (orderId: string) => Promise<void>;
 }
 
 export const useOrdersStore = create<OrdersState>()(() => ({
@@ -39,6 +41,19 @@ export const useOrdersStore = create<OrdersState>()(() => ({
 
   rechazarPago: async (orderId) => {
     await updateDoc(doc(db, 'orders', orderId), { paymentStatus: 'rechazado' });
+  },
+
+  // Pedido y tickets juntos, así ningún puesto sigue preparándolo.
+  cancelarPedido: async (orderId) => {
+    const tickets = await getDocs(query(collection(db, 'stallTickets'), where('orderId', '==', orderId)));
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'orders', orderId), { status: 'cancelado', cancelledAt: serverTimestamp(), cancelledBy: 'admin' });
+    tickets.forEach((t) => batch.update(t.ref, { status: 'cancelado' }));
+    await batch.commit();
+  },
+
+  marcarReembolsado: async (orderId) => {
+    await updateDoc(doc(db, 'orders', orderId), { paymentStatus: 'reembolsado' });
   },
 }));
 
@@ -82,6 +97,10 @@ function subscribe() {
       });
       useOrdersStore.setState({ orders, loaded: true, hasMore: orders.length === pageSize });
       resolveClientNames(orders.map((o) => o.uid));
+    },
+    (error) => {
+      console.error('[ordersStore] listener error:', error.code, error.message);
+      useOrdersStore.setState({ loaded: true });
     }
   );
 }

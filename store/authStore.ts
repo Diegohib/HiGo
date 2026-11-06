@@ -46,6 +46,9 @@ export interface AppUser {
   cedula?: string;
   numCoche?: string;
   stallNumber?: string;
+  // Transportista: el vehículo con el que reparte y su placa.
+  vehiculo?: string;
+  placa?: string;
   giro?: string;
   rejectionReason?: string;
   photoUri?: string;
@@ -89,6 +92,8 @@ interface RegisterStaffParams {
   cedula?: string;
   numCoche?: string;
   stallNumber?: string;
+  vehiculo?: string;
+  placa?: string;
   giro?: string;
 }
 
@@ -138,7 +143,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
     await sendEmailVerification(cred.user);
   },
 
-  registerStaff: async ({ name, firstName, lastName, email, phone, password, role, edad, cedula, numCoche, stallNumber, giro }) => {
+  registerStaff: async ({ name, firstName, lastName, email, phone, password, role, edad, cedula, numCoche, stallNumber, vehiculo, placa, giro }) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await setDoc(doc(db, 'users', cred.user.uid), {
       role,
@@ -152,6 +157,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
       ...(cedula      ? { cedula }      : {}),
       ...(numCoche    ? { numCoche }    : {}),
       ...(stallNumber ? { stallNumber } : {}),
+      ...(vehiculo    ? { vehiculo }    : {}),
+      ...(placa       ? { placa }       : {}),
       ...(giro        ? { giro }        : {}),
       createdAt: serverTimestamp(),
     });

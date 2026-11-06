@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import {
   collection,
   doc,
-  updateDoc,
   writeBatch,
+  getDocs,
   onSnapshot,
   query,
   where,
@@ -23,29 +23,26 @@ export type OrderStatus =
   | 'en_mercado'
   | 'consolidado'
   | 'en_camino'
-  | 'entregado';
+  | 'entregado'
+  // Fuera de la secuencia: el cliente lo cancela antes de que un cochero lo
+  // tome, o el admin en cualquier momento desde el panel web.
+  | 'cancelado';
 
 // ─── Pago ─────────────────────────────────────────────────────────────────────
 //   transferencia → el cliente sube el comprobante ('por_verificar'); el admin
 //                   lo confirma ('verificado') o lo rechaza ('rechazado').
 //   efectivo      → se cobra al entregar ('contra_entrega' → 'cobrado' cuando
 //                   el transportista confirma la entrega). Tope: CASH_LIMIT.
+//   'reembolsado' → transferencia confirmada de un pedido cancelado, ya
+//                   devuelta por el admin.
 // `released`: si el pedido ya puede moverse (comerciantes y cochero lo ven).
 // Transferencia: recién cuando el admin confirma el pago. Efectivo: enseguida.
 // Pedidos viejos no traen nada de esto y se tratan como liberados.
 
 export type PaymentMethod = 'transferencia' | 'efectivo';
-export type PaymentStatus = 'por_verificar' | 'verificado' | 'rechazado' | 'contra_entrega' | 'cobrado';
+export type PaymentStatus = 'por_verificar' | 'verificado' | 'rechazado' | 'contra_entrega' | 'cobrado' | 'reembolsado';
 
 export const CASH_LIMIT = 100;
-
-export const ORDER_STATUS_SEQUENCE: OrderStatus[] = [
-  'recibido',
-  'en_mercado',
-  'consolidado',
-  'en_camino',
-  'entregado',
-];
 
 export interface Order {
   id: string;
@@ -85,18 +82,29 @@ export interface Order {
   receiptUrl?: string;
   paymentRef?: string;   // número de comprobante de la transferencia
   released?: boolean;
+  // Cuándo se juntó todo en el mercado y cuándo se entregó (pedidos viejos no
+  // los traen); con eso se calculan las ganancias de cada día.
+  consolidadoAt?: number;
+  deliveredAt?: number;
+  cancelledAt?: number;
+  cancelledBy?: 'cliente' | 'admin';
   total: number;
   items: CartItem[];
   createdAt: number;
 }
 
+// El cliente puede cancelar mientras ningún cochero lo haya tomado.
+export function canClientCancel(order: Order): boolean {
+  return order.status === 'recibido' && !order.operatorUid;
+}
+
 interface OrdersState {
   orders: Order[];
   createOrder: (data: Omit<Order, 'id' | 'status' | 'createdAt'>) => Promise<string>;
-  advanceStatus: (id: string) => Promise<void>;
+  cancelOrder: (id: string) => Promise<void>;
 }
 
-export const useOrdersStore = create<OrdersState>()((set, get) => ({
+export const useOrdersStore = create<OrdersState>()(() => ({
   orders: [],
 
   // El pedido y sus tickets por puesto (ver stallTicketsStore) se guardan en
@@ -122,14 +130,20 @@ export const useOrdersStore = create<OrdersState>()((set, get) => ({
     return orderRef.id;
   },
 
-  advanceStatus: async (id) => {
-    const order = get().orders.find((o) => o.id === id);
-    if (!order) return;
-    const nextIndex = Math.min(
-      ORDER_STATUS_SEQUENCE.indexOf(order.status) + 1,
-      ORDER_STATUS_SEQUENCE.length - 1
-    );
-    await updateDoc(doc(db, 'orders', id), { status: ORDER_STATUS_SEQUENCE[nextIndex] });
+  // Pedido y tickets en un solo batch, así ningún puesto se queda preparando
+  // un pedido cancelado.
+  cancelOrder: async (id) => {
+    const uid = useAuthStore.getState().user?.uid;
+    if (!uid) return;
+    const tickets = await getDocs(query(
+      collection(db, 'stallTickets'),
+      where('orderId', '==', id),
+      where('clientUid', '==', uid),
+    ));
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'orders', id), { status: 'cancelado', cancelledAt: serverTimestamp(), cancelledBy: 'cliente' });
+    tickets.forEach((t) => batch.update(t.ref, { status: 'cancelado' }));
+    await batch.commit();
   },
 }));
 
@@ -149,6 +163,9 @@ function toOrder(id: string, data: any): Order {
     transportistaUid:   data.transportistaUid ?? '',
     transportistaName:  data.transportistaName ?? '',
     transportistaPhone: data.transportistaPhone ?? '',
+    consolidadoAt: (data.consolidadoAt as Timestamp | undefined)?.toMillis(),
+    deliveredAt:   (data.deliveredAt as Timestamp | undefined)?.toMillis(),
+    cancelledAt:   (data.cancelledAt as Timestamp | undefined)?.toMillis(),
     createdAt: (data.createdAt as Timestamp | undefined)?.toMillis() ?? Date.now(),
   } as Order;
 }
@@ -166,7 +183,9 @@ useAuthStore.subscribe((state) => {
     ? query(collection(db, 'orders'), orderBy('createdAt', 'desc'))
     : query(collection(db, 'orders'), where('uid', '==', state.user.uid), orderBy('createdAt', 'desc'));
 
-  unsubOrders = onSnapshot(ordersQuery, (snap) => {
-    useOrdersStore.setState({ orders: snap.docs.map((d) => toOrder(d.id, d.data())) });
-  });
+  unsubOrders = onSnapshot(
+    ordersQuery,
+    (snap) => useOrdersStore.setState({ orders: snap.docs.map((d) => toOrder(d.id, d.data())) }),
+    (error) => console.error('[ordersStore] orders listener error:', error.code, error.message),
+  );
 });

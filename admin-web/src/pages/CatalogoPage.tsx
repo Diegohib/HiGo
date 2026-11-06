@@ -20,6 +20,7 @@ export default function CatalogoPage() {
   const [seeding, setSeeding] = useState(false);
   const comerciantes = useComerciantesStore((s) => s.comerciantes);
   const sinPuesto = products.filter((p) => !p.comercianteUid).length;
+  const agotados = products.filter((p) => p.agotado);
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -42,6 +43,26 @@ export default function CatalogoPage() {
       alert('No se pudo importar el catálogo inicial.');
     } finally {
       setSeeding(false);
+    }
+  }
+
+  async function toggleAgotado(p: Product) {
+    try {
+      await updateProduct(p.id, { agotado: !p.agotado });
+    } catch (err) {
+      console.error('[CatalogoPage] agotado:', err);
+      alert('No se pudo actualizar el producto.');
+    }
+  }
+
+  // Para empezar el día: todo vuelve a estar disponible.
+  async function reponerTodos() {
+    if (!confirm(`¿Marcar los ${agotados.length} productos agotados como disponibles?`)) return;
+    try {
+      await Promise.all(agotados.map((p) => updateProduct(p.id, { agotado: false })));
+    } catch (err) {
+      console.error('[CatalogoPage] reponer:', err);
+      alert('No se pudieron actualizar todos los productos.');
     }
   }
 
@@ -102,6 +123,15 @@ export default function CatalogoPage() {
         </p>
       )}
 
+      {!empty && tab === 'productos' && agotados.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 0 12px' }}>
+          <p style={{ color: 'var(--text-soft)', margin: 0, flex: 1 }}>
+            {agotados.length} producto{agotados.length !== 1 ? 's' : ''} agotado{agotados.length !== 1 ? 's' : ''} hoy: los clientes los ven pero no los pueden pedir.
+          </p>
+          <button className="btn btn-ghost btn-sm" onClick={reponerTodos}>Todo disponible</button>
+        </div>
+      )}
+
       {empty ? (
         <div className="empty-box">
           <p className="empty-title">Todavía no hay catálogo cargado</p>
@@ -121,7 +151,10 @@ export default function CatalogoPage() {
             <div className="row-card" key={p.id} style={{ cursor: 'pointer' }} onClick={() => setEditingProduct(p)}>
               <img className="row-thumb" src={p.image} alt="" />
               <div className="row-info">
-                <p className="row-title">{p.name}</p>
+                <p className="row-title">
+                  {p.name}
+                  {p.agotado && <span className="badge badge-rechazada" style={{ marginLeft: 8 }}>Agotado</span>}
+                </p>
                 <p className="row-sub">
                   {categories.find((c) => c.id === p.categoryId)?.name ?? p.categoryId}
                   {p.presentations[0] ? ` · ${p.presentations[0].price.toFixed(2)} / ${p.presentations[0].label}` : ''}
@@ -130,6 +163,9 @@ export default function CatalogoPage() {
                   {p.comercianteUid ? `Puesto ${p.stallNumber || '—'} · ${p.comercianteName}` : 'Sin puesto asignado'}
                 </p>
               </div>
+              <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); toggleAgotado(p); }}>
+                {p.agotado ? 'Hay stock' : 'Agotado'}
+              </button>
               <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); handleDeleteProduct(p); }}>
                 Eliminar
               </button>

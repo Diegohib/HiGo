@@ -46,10 +46,14 @@ export default function ListScreen() {
 
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.price}>
-            ${base.price.toFixed(2)}
-            <Text style={styles.unit}> / {base.label}</Text>
-          </Text>
+          {item.agotado ? (
+            <Text style={[styles.price, { color: C.danger }]}>Agotado por hoy</Text>
+          ) : (
+            <Text style={styles.price}>
+              ${base.price.toFixed(2)}
+              <Text style={styles.unit}> / {base.label}</Text>
+            </Text>
+          )}
         </View>
 
         <View style={styles.actions}>

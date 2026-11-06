@@ -6,7 +6,7 @@ import { OrderStatus } from './ordersStore';
 // ─── Ganancias del cochero ────────────────────────────────────────────────────
 // Salen de sus pedidos reales (los "mios" de cocheroTicketStore): cuenta cada
 // pedido que ya terminó de juntar — consolidado, en camino o entregado — de la
-// semana actual. Se usa la fecha del pedido: el cochero lo junta el mismo día.
+// semana actual, el día en que lo consolidó (pedidos viejos: el día del pedido).
 
 export interface DayRecord {
   date:        Date;
@@ -24,8 +24,9 @@ export function useCocheroStore() {
     const weekStart = weekRecords[0].date.getTime();
 
     for (const t of mios) {
-      if (!DONE.includes(t.status) || t.createdAt < weekStart) continue;
-      const day = new Date(t.createdAt);
+      const at = t.consolidadoAt ?? t.createdAt;
+      if (!DONE.includes(t.status) || at < weekStart) continue;
+      const day = new Date(at);
       day.setHours(0, 0, 0, 0);
       // Sábado y domingo se suman al viernes: se pagan con esa semana.
       const rec = weekRecords.find((r) => r.date.getTime() === day.getTime()) ?? weekRecords[4];

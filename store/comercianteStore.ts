@@ -102,9 +102,10 @@ useAuthStore.subscribe((state) => {
     unsubTickets = onSnapshot(
       query(collection(db, 'stallTickets'), where('comercianteUid', '==', state.user!.uid)),
       (snap) => {
-        // Los de transferencias sin confirmar todavía no se preparan.
+        // Los de transferencias sin confirmar todavía no se preparan, y los
+        // de pedidos cancelados ya no.
         const tickets = snap.docs
-          .filter((d) => d.data().released !== false)
+          .filter((d) => d.data().released !== false && d.data().status !== 'cancelado')
           .map((d) => toStallTicket(d.id, d.data()))
           .sort((a, b) => b.createdAt - a.createdAt);
         const weeklySales = buildWeekSales(tickets);
@@ -115,6 +116,10 @@ useAuthStore.subscribe((state) => {
           fridayBalance:   parseFloat(weeklySales.reduce((s, d) => s + d.amount, 0).toFixed(2)),
           fridayDate:      nextPayFriday(),
         });
+      },
+      (error) => {
+        console.error('[comercianteStore] stallTickets listener error:', error.code, error.message);
+        useComercianteStore.setState({ loaded: true });
       }
     );
   } else if (!isComerciante && unsubTickets) {

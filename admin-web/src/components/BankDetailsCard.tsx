@@ -21,11 +21,15 @@ export default function BankDetailsCard() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    return onSnapshot(doc(db, 'config', 'payment'), (snap) => {
-      const data = snap.exists() ? { ...EMPTY, ...(snap.data() as Partial<BankDetails>) } : null;
-      setSaved(data);
-      if (data) setForm(data);
-    });
+    return onSnapshot(
+      doc(db, 'config', 'payment'),
+      (snap) => {
+        const data = snap.exists() ? { ...EMPTY, ...(snap.data() as Partial<BankDetails>) } : null;
+        setSaved(data);
+        if (data) setForm(data);
+      },
+      (error) => console.error('[BankDetailsCard] config/payment listener error:', error.code, error.message),
+    );
   }, []);
 
   const dirty = JSON.stringify(form) !== JSON.stringify(saved ?? EMPTY);

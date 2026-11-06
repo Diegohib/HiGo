@@ -23,6 +23,7 @@ import { Product } from '../data/products';
 //   pendiente → el comerciante lo está preparando
 //   listo     → el comerciante lo dejó listo para retirar
 //   retirado  → el cochero (trabaja en el mercado) ya se lo llevó
+//   cancelado → se canceló el pedido: no hay que prepararlo
 //
 // Cuando todos los tickets de un pedido quedan retirados, el pedido pasa solo
 // a 'consolidado' y queda disponible para los transportistas. Programada o
@@ -31,7 +32,7 @@ import { Product } from '../data/products';
 // Los productos sin puesto asignado van a un ticket "Sin puesto" que ningún
 // comerciante ve: el cochero los consigue y lo marca retirado.
 
-export type StallTicketStatus = 'pendiente' | 'listo' | 'retirado';
+export type StallTicketStatus = 'pendiente' | 'listo' | 'retirado' | 'cancelado';
 export type OrderRoute = 'programada' | 'directa';
 
 export const NO_STALL_UID = '';
@@ -167,7 +168,7 @@ export async function marcarRetirado(ticket: StallTicket) {
   const all = await getDocs(query(collection(db, 'stallTickets'), where('orderId', '==', ticket.orderId)));
   const allRetirados = all.docs.every((d) => d.id === ticket.id || d.data().status === 'retirado');
   if (allRetirados) {
-    await updateDoc(doc(db, 'orders', ticket.orderId), { status: 'consolidado' });
+    await updateDoc(doc(db, 'orders', ticket.orderId), { status: 'consolidado', consolidadoAt: serverTimestamp() });
   }
 }
 

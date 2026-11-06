@@ -59,6 +59,10 @@ function subscribe() {
         } as Solicitud;
       });
       useSolicitudesStore.setState({ solicitudes, loaded: true, hasMore: solicitudes.length === pageSize });
+    },
+    (error) => {
+      console.error('[solicitudesStore] listener error:', error.code, error.message);
+      useSolicitudesStore.setState({ loaded: true });
     }
   );
 }

@@ -37,9 +37,11 @@ export const useOrderChatStore = create<OrderChatState>()((set) => ({
 
   subscribe: (orderId) => {
     const q = query(collection(db, 'orderChats', orderId, 'messages'), orderBy('createdAt', 'asc'));
-    return onSnapshot(q, (snap) => {
-      set({ messages: snap.docs.map((d) => toMessage(d.id, d.data())) });
-    });
+    return onSnapshot(
+      q,
+      (snap) => set({ messages: snap.docs.map((d) => toMessage(d.id, d.data())) }),
+      (error) => console.error('[orderChatStore] messages listener error:', error.code, error.message),
+    );
   },
 
   sendMessage: async (orderId, text) => {
