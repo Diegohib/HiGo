@@ -101,8 +101,8 @@ export default function OrderChatScreen() {
               <Ionicons name="chatbubbles-outline" size={40} color={C.textFaint} />
               <Text style={styles.emptyText}>
                 {isCochero
-                  ? 'Escribile al cliente si necesitás coordinar algo de su pedido.'
-                  : 'Escribile a tu cochero si necesitás coordinar algo de tu pedido.'}
+                  ? 'Escríbele al cliente si necesitas coordinar algo de su pedido.'
+                  : 'Escríbele a tu cochero si necesitas coordinar algo de tu pedido.'}
               </Text>
             </View>
           ) : (
@@ -132,7 +132,7 @@ export default function OrderChatScreen() {
             style={styles.input}
             value={text}
             onChangeText={setText}
-            placeholder="Escribí tu mensaje…"
+            placeholder="Escribe tu mensaje…"
             placeholderTextColor={C.textFaint}
             multiline
           />

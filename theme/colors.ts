@@ -24,8 +24,9 @@ export const lightColors: ThemeColors = {
   background:    '#F7F5FF',
   surface:       '#FFFFFF',
   surfaceAlt:    '#EDE7F6',
-  primary:       '#3D1F8B',
-  primaryDark:   '#2D1570',
+  // Morado de marca vivo (el mismo de las pantallas de acceso).
+  primary:       '#5B2BD9',
+  primaryDark:   '#3D1F8B',
   primaryFaint:  '#EDE9F8',
   text:          '#1A1A1A',
   textSoft:      '#666666',
@@ -38,7 +39,7 @@ export const lightColors: ThemeColors = {
   dangerFaint:   '#FDECEA',
   warning:       '#F2C94C',
   warningFaint:  '#FFF3CD',
-  headerGradient: ['#3D1F8B', '#5B3FB0'],
+  headerGradient: ['#4B22C2', '#7B4BF5'],
   statusBarStyle: 'light-content',
 };
 

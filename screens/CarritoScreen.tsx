@@ -58,7 +58,7 @@ export default function CarritoScreen() {
           <Text style={styles.rowName} numberOfLines={2}>{product.name}</Text>
           <Text style={styles.rowPresentation}>{item.presentationLabel}</Text>
           {product.agotado ? (
-            <Text style={[styles.rowPrice, { color: C.danger }]}>Agotado por hoy · quitalo para seguir</Text>
+            <Text style={[styles.rowPrice, { color: C.danger }]}>Agotado por hoy · quítalo para seguir</Text>
           ) : (
             <Text style={styles.rowPrice}>
               ${(item.presentationPrice * item.quantity).toFixed(2)}
@@ -106,7 +106,7 @@ export default function CarritoScreen() {
       <View style={styles.empty}>
         <Ionicons name="cart-outline" size={72} color="#D4C9F5" />
         <Text style={styles.emptyTitle}>Tu carrito está vacío</Text>
-        <Text style={styles.emptyText}>Agregá productos desde el catálogo</Text>
+        <Text style={styles.emptyText}>Agrega productos desde el catálogo</Text>
         <TouchableOpacity
           style={styles.emptyBtn}
           activeOpacity={0.85}

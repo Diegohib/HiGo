@@ -16,21 +16,21 @@ export const FAQS: FaqSeed[] = [
     id: 'fq1',
     question: '¿Cómo funciona HiGo?',
     answer:
-      'HiGo es el mercado mayorista de la ciudad, directo desde tu celular: elegís tus productos por categoría, los agregás al carrito, confirmás tu pedido con tu dirección de entrega y un cochero o transportista te lo lleva a domicilio.',
+      'HiGo es el mercado mayorista de la ciudad, directo desde tu celular: eliges tus productos por categoría, los agregas al carrito, confirmas tu pedido con tu dirección de entrega y un cochero o transportista te lo lleva a domicilio.',
     keywords: ['como funciona', 'que es higo', 'para que sirve', 'que es esto', 'de que trata'],
   },
   {
     id: 'fq2',
     question: '¿Cómo hago un pedido?',
     answer:
-      'Desde Inicio elegí una categoría o buscá el producto que necesitás, tocá el botón + para agregarlo al carrito, y cuando termines andá a tu carrito y presioná "Confirmar pedido". Ahí elegís tu dirección de entrega.',
+      'Desde Inicio elige una categoría o busca el producto que necesitas, toca el botón + para agregarlo al carrito, y cuando termines ve a tu carrito y presiona "Confirmar pedido". Ahí eliges tu dirección de entrega.',
     keywords: ['hacer un pedido', 'hago un pedido', 'como compro', 'como pido', 'agregar al carrito', 'comprar'],
   },
   {
     id: 'fq3',
     question: '¿Necesito crear una cuenta para comprar?',
     answer:
-      'Podés navegar el catálogo sin cuenta, pero para confirmar un pedido sí necesitás una cuenta gratis — te la pedimos justo antes de confirmar y solo toma un minuto.',
+      'Puedes navegar el catálogo sin cuenta, pero para confirmar un pedido sí necesitas una cuenta gratis — te la pedimos justo antes de confirmar y solo toma un minuto.',
     keywords: ['necesito cuenta', 'sin cuenta', 'cuenta gratis', 'invitado', 'registrarme para comprar'],
   },
   {
@@ -56,34 +56,34 @@ export const FAQS: FaqSeed[] = [
     id: 'fq7',
     question: '¿Cómo sigo mi pedido?',
     answer:
-      'Desde la confirmación del pedido, o desde tu historial en la cuenta, podés abrir el seguimiento y ver el estado en tiempo real hasta que llegue a tu puerta.',
+      'Desde la confirmación del pedido, o desde tu historial en la cuenta, puedes abrir el seguimiento y ver el estado en tiempo real hasta que llegue a tu puerta.',
     keywords: ['seguir mi pedido', 'donde esta mi pedido', 'rastrear', 'estado del pedido', 'tracking'],
   },
   {
     id: 'fq8',
     question: '¿Cómo cambio mi dirección de entrega?',
     answer:
-      'Andá a Cuenta y editá tu dirección, o marcá el pin correcto en el mapa la próxima vez que hagas checkout — se guarda para tus próximos pedidos.',
+      'Ve a Cuenta y edita tu dirección, o marca el pin correcto en el mapa la próxima vez que hagas checkout — se guarda para tus próximos pedidos.',
     keywords: ['cambiar direccion', 'editar direccion', 'mi direccion', 'donde entregan'],
   },
   {
     id: 'fq9',
     question: '¿Cómo edito mi perfil o mi foto?',
     answer:
-      'En la pestaña Cuenta podés tocar tu foto para cambiarla, y editar tu nombre, apodo, teléfono y otros datos desde ahí mismo.',
+      'En la pestaña Cuenta puedes tocar tu foto para cambiarla, y editar tu nombre, apodo, teléfono y otros datos desde ahí mismo.',
     keywords: ['editar perfil', 'cambiar foto', 'mis datos', 'editar cuenta', 'cambiar nombre'],
   },
   {
     id: 'fq10',
     question: '¿Tengo que verificar mi correo?',
-    answer: 'Sí. Al crear tu cuenta te enviamos un correo de verificación — confirmalo para poder usar HiGo sin restricciones.',
+    answer: 'Sí. Al crear tu cuenta te enviamos un correo de verificación — confírmalo para poder usar HiGo sin restricciones.',
     keywords: ['verificar correo', 'confirmar email', 'correo de verificacion', 'verificar cuenta'],
   },
   {
     id: 'fq11',
     question: '¿Cómo trabajo como cochero, transportista o comerciante?',
     answer:
-      'Desde la pantalla de acceso operativo elegí tu rol (Cochero, Transportista o Comerciante) y completá el registro con tus datos y documentos. Un administrador revisa tu solicitud en menos de 24 horas.',
+      'Desde la pantalla de acceso operativo elige tu rol (Cochero, Transportista o Comerciante) y completa el registro con tus datos y documentos. Un administrador revisa tu solicitud en menos de 24 horas.',
     keywords: ['trabajar en higo', 'trabajo como cochero', 'trabajo como transportista', 'trabajo como comerciante', 'ser cochero', 'ser transportista', 'ser comerciante', 'quiero trabajar', 'personal operativo'],
   },
   {
@@ -97,35 +97,35 @@ export const FAQS: FaqSeed[] = [
     id: 'fq13',
     question: '¿Qué hago si mi solicitud de personal fue rechazada?',
     answer:
-      'Vas a ver el motivo del rechazo en la app. Podés corregir lo que falte (por ejemplo una foto ilegible o un dato incompleto) y volver a enviar tu solicitud.',
+      'Vas a ver el motivo del rechazo en la app. Puedes corregir lo que falte (por ejemplo una foto ilegible o un dato incompleto) y volver a enviar tu solicitud.',
     keywords: ['solicitud rechazada', 'por que me rechazaron', 'corregir solicitud'],
   },
   {
     id: 'fq14',
     question: '¿Cómo hablo con un administrador?',
     answer:
-      'Tocá "Hablar con un administrador" acá mismo en el asistente, o desde el seguimiento de tu pedido — te abre un chat directo para lo que necesites.',
+      'Toca "Hablar con un administrador" acá mismo en el asistente, o desde el seguimiento de tu pedido — te abre un chat directo para lo que necesites.',
     keywords: ['hablar con administrador', 'contactar soporte', 'hablar con alguien', 'atencion al cliente', 'soporte'],
   },
   {
     id: 'fq15',
     question: 'Olvidé mi contraseña, ¿qué hago?',
     answer:
-      'Por ahora no hay una opción de recuperación automática en la app — escribinos por "Hablar con un administrador" y te ayudamos a recuperar el acceso a tu cuenta.',
+      'Por ahora no hay una opción de recuperación automática en la app — escríbenos por "Hablar con un administrador" y te ayudamos a recuperar el acceso a tu cuenta.',
     keywords: ['olvide mi contraseña', 'recuperar contraseña', 'no puedo entrar', 'contraseña olvidada'],
   },
   {
     id: 'fq16',
     question: '¿Qué productos puedo comprar?',
     answer:
-      'Encontrás el catálogo organizado por categorías como tubérculos, frutas, verduras, arroz, azúcar y huevos — cada una con sus productos y presentaciones.',
+      'Encuentras el catálogo organizado por categorías como tubérculos, frutas, verduras, arroz, azúcar y huevos — cada una con sus productos y presentaciones.',
     keywords: ['que venden', 'categorias de productos', 'que productos hay', 'que puedo comprar'],
   },
   {
     id: 'fq17',
     question: '¿Cómo creo mi cuenta?',
     answer:
-      'Desde la pestaña Cuenta vas a ver un botón para crear tu cuenta (o te lo pedimos al confirmar tu primer pedido). Solo completá nombre, correo, teléfono y contraseña, y confirmá el correo de verificación que te enviamos.',
+      'Desde la pestaña Cuenta vas a ver un botón para crear tu cuenta (o te lo pedimos al confirmar tu primer pedido). Solo completa nombre, correo, teléfono y contraseña, y confirma el correo de verificación que te enviamos.',
     keywords: ['crear cuenta', 'como me registro', 'abrir cuenta', 'hacer una cuenta', 'registrarme', 'nueva cuenta'],
   },
 ];

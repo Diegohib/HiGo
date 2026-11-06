@@ -158,11 +158,11 @@ export default function OrderTrackingScreen() {
     } :
     order.paymentStatus === 'rechazado' ? {
       icon: 'alert-circle-outline' as const, color: C.danger,
-      text: 'No pudimos confirmar tu transferencia. Escribinos por el chat para resolverlo.',
+      text: 'No pudimos confirmar tu transferencia. Escríbenos por el chat para resolverlo.',
     } :
     order.paymentStatus === 'contra_entrega' ? {
       icon: 'cash-outline' as const, color: C.primary,
-      text: `Pagás ${order.total.toFixed(2)} en efectivo al recibir tu pedido.`,
+      text: `Pagas ${order.total.toFixed(2)} en efectivo al recibir tu pedido.`,
     } :
     order.paymentStatus === 'verificado' ? {
       icon: 'checkmark-circle-outline' as const, color: C.success,
@@ -186,7 +186,7 @@ export default function OrderTrackingScreen() {
               await cancelOrder(orderId);
             } catch (err) {
               console.error('[OrderTracking] cancel error:', err);
-              Alert.alert('No se pudo cancelar', 'Puede que un cochero ya lo haya tomado. Escribinos por el chat.');
+              Alert.alert('No se pudo cancelar', 'Puede que un cochero ya lo haya tomado. Escríbenos por el chat.');
             } finally {
               setCancelling(false);
             }

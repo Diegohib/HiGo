@@ -33,7 +33,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
   async function handleRegister() {
     if (!name.trim() || !email.trim() || !phone.trim() || !password || !confirmPassword) {
-      Alert.alert('Campos incompletos', 'Por favor completá todos los campos.');
+      Alert.alert('Campos incompletos', 'Por favor completa todos los campos.');
       return;
     }
     if (password.length < MIN_PASSWORD_LENGTH) {
@@ -53,7 +53,7 @@ export default function RegisterScreen({ navigation }: Props) {
       // esta alerta queda arriba de esa pantalla como confirmación explícita.
       Alert.alert(
         '¡Cuenta creada! 🎉',
-        `Te enviamos un correo de verificación a ${trimmedEmail}. Abrilo y confirmá tu cuenta para poder ingresar a HiGo.`
+        `Te enviamos un correo de verificación a ${trimmedEmail}. Ábrelo y confirma tu cuenta para poder ingresar a HiGo.`
       );
     } catch (error: any) {
       console.error('[register]', error?.code, error?.message, error);
@@ -73,8 +73,8 @@ export default function RegisterScreen({ navigation }: Props) {
   return (
     <AuthScreen
       eyebrow="Nueva cuenta"
-      title="Creá tu cuenta"
-      subtitle="Pedí del Mercado Mayorista y recibí en tu puerta."
+      title="Crea tu cuenta"
+      subtitle="Pide del Mercado Mayorista y recibe en tu puerta."
       onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
     >
       <AuthField
@@ -147,7 +147,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
       <AuthPrimaryButton label="Crear cuenta" loading={submitting} onPress={handleRegister} />
 
-      <AuthDivider text="¿Ya tenés cuenta?" />
+      <AuthDivider text="¿Ya tienes cuenta?" />
       <AuthSecondaryButton
         label="Iniciar sesión"
         icon="log-in-outline"

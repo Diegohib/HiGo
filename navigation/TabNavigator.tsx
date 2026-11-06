@@ -15,7 +15,7 @@ import { RADIUS, floatingShadow } from '../theme/elevation';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
-const ACTIVE   = '#3D1F8B';
+const ACTIVE   = '#5B2BD9';
 const INACTIVE = '#9B8EC4';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];

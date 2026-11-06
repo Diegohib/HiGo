@@ -1,195 +1,126 @@
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import Text from '../components/Text';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList, StaffRole } from '../navigation/types';
+import { AuthScreen, AuthTextLink } from '../components/AuthLayout';
 import { useThemeColors } from '../theme/useThemeColors';
 import { ThemeColors } from '../theme/colors';
-import { RADIUS, SPACING, cardShadow } from '../theme/elevation';
+import { RADIUS, SPACING } from '../theme/elevation';
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'RoleSelection'>;
 };
 
 type RoleCard = {
-  id: StaffRole; label: string; icon: string; description: string; color: string;
-  ionIcon?: keyof typeof Ionicons.glyphMap; gradient?: [string, string];
-  dashboard: keyof RootStackParamList;
+  id:          StaffRole;
+  label:       string;
+  description: string;
+  icon:        keyof typeof Ionicons.glyphMap;
+  dashboard:   keyof RootStackParamList;
 };
 
-const roles: RoleCard[] = [
-  {
-    id: 'cochero', label: 'Cochero', icon: '🚲', description: 'Llevo compras dentro del mercado', color: '#3D1F8B',
-    ionIcon: 'bicycle', gradient: ['#3D1F8B', '#2D1570'], dashboard: 'CocheroDashboard',
-  },
-  {
-    id: 'transportista', label: 'Transportista', icon: '🚚', description: 'Entrego pedidos en la ciudad', color: '#3D1F8B',
-    ionIcon: 'car', gradient: ['#3D1F8B', '#2D1570'], dashboard: 'TransportistaDashboard',
-  },
-  {
-    id: 'comerciante', label: 'Comerciante', icon: '🏪', description: 'Vendo mis productos en el mercado', color: '#3D1F8B',
-    ionIcon: 'storefront', gradient: ['#3D1F8B', '#2D1570'], dashboard: 'ComercianteDashboard',
-  },
+// Mismo orden que recorre un pedido: el comerciante lo prepara, el cochero lo
+// junta en el mercado y el transportista lo lleva.
+const ROLES: RoleCard[] = [
+  { id: 'comerciante',   label: 'Comerciante',   icon: 'storefront', dashboard: 'ComercianteDashboard',
+    description: 'Tengo un puesto en el mercado y preparo los pedidos.' },
+  { id: 'cochero',       label: 'Cochero',       icon: 'bicycle',    dashboard: 'CocheroDashboard',
+    description: 'Recojo los pedidos en cada puesto y los junto.' },
+  { id: 'transportista', label: 'Transportista', icon: 'car',        dashboard: 'TransportistaDashboard',
+    description: 'Llevo los pedidos del mercado a cada cliente.' },
 ];
 
 export default function RoleSelectionScreen({ navigation }: Props) {
   const C = useThemeColors();
-  const styles = makeStyles(C);
-  return (
-    <LinearGradient colors={C.headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerBadge}>
-          <Ionicons name="briefcase-outline" size={24} color="#FFFFFF" />
-        </View>
-        <Text style={styles.subtitle}>¿Cuál es tu rol?</Text>
-        <Text style={styles.hint}>Seleccioná para crear tu cuenta</Text>
-      </View>
+  const s = makeStyles(C);
 
-      <View style={styles.rolesGrid}>
-        {roles.map((role) => (
+  return (
+    <AuthScreen
+      eyebrow="Trabaja con HiGo"
+      title="¿Cuál es tu rol?"
+      subtitle="Elige cómo vas a trabajar en el Mercado Mayorista."
+      onBack={() => navigation.goBack()}
+    >
+      <View style={s.list}>
+        {ROLES.map((role) => (
           <TouchableOpacity
             key={role.id}
-            style={styles.roleCard}
+            style={s.card}
             activeOpacity={0.85}
             onPress={() => navigation.navigate('StaffRegister', { role: role.id })}
           >
-            {role.ionIcon && role.gradient ? (
-              <LinearGradient
-                colors={role.gradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.iconCircle, styles.iconCircleShadow, { shadowColor: role.color }]}
-              >
-                <Ionicons name={role.ionIcon} size={26} color="#FFFFFF" />
-              </LinearGradient>
-            ) : (
-              <View style={[styles.iconCircle, { backgroundColor: `${role.color}1F` }]}>
-                <Text style={styles.roleIcon}>{role.icon}</Text>
-              </View>
-            )}
-            <View style={styles.roleText}>
-              <Text style={styles.roleLabel}>{role.label}</Text>
-              <Text style={styles.roleDescription}>{role.description}</Text>
+            <View style={s.iconBox}>
+              <Ionicons name={role.icon} size={22} color={C.primary} />
             </View>
+            <View style={s.cardText}>
+              <Text style={s.cardTitle}>{role.label}</Text>
+              <Text style={s.cardDesc}>{role.description}</Text>
+            </View>
+            {/* Solo para revisar el diseño del panel sin crear una cuenta */}
             <TouchableOpacity
-              style={styles.previewBtn}
+              style={s.previewBtn}
               activeOpacity={0.7}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={(e) => { e.stopPropagation(); navigation.navigate(role.dashboard as any); }}
+              hitSlop={8}
+              accessibilityLabel={`Ver panel de ${role.label}`}
+              onPress={() => navigation.navigate(role.dashboard as any)}
             >
-              <Ionicons name="eye-outline" size={18} color={C.textFaint} />
+              <Ionicons name="eye-outline" size={16} color={C.textFaint} />
             </TouchableOpacity>
-            <Ionicons name="chevron-forward" size={20} color={C.textFaint} />
+            <Ionicons name="chevron-forward" size={18} color={C.textFaint} />
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Solo para revisar diseño sin tener que crear una cuenta real */}
-      <View style={styles.previewHintRow}>
-        <Ionicons name="eye-outline" size={13} color="rgba(255,255,255,0.55)" />
-        <Text style={styles.previewHint}>Tocá el ícono del ojo para ver el panel sin registrarte</Text>
+      <View style={s.infoRow}>
+        <Ionicons name="shield-checkmark-outline" size={16} color={C.textSoft} />
+        <Text style={s.infoText}>
+          Un administrador revisa tu solicitud y tus documentos en menos de 24 horas.
+        </Text>
       </View>
-    </LinearGradient>
+
+      <AuthTextLink label="Ya tengo una cuenta" icon="log-in-outline" onPress={() => navigation.navigate('Login')} />
+    </AuthScreen>
   );
 }
 
 const makeStyles = (C: ThemeColors) => StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 48,
-    paddingBottom: 40,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: SPACING.xxl,
-  },
-  headerBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: RADIUS.xl,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 18,
-  },
-  subtitle: {
-    fontSize: 21,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 4,
-    letterSpacing: -0.3,
-  },
-  hint: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    opacity: 0.75,
-  },
-  rolesGrid: {
-    gap: 14,
-  },
-  roleCard: {
-    backgroundColor: C.surface,
-    borderRadius: RADIUS.xl,
-    padding: 18,
+  list: { gap: SPACING.md },
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    ...cardShadow(C),
+    gap: SPACING.md,
+    padding: SPACING.md + 2,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    backgroundColor: C.surface,
   },
-  iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  iconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.primaryFaint,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
-  roleIcon: {
-    fontSize: 28,
-  },
-  iconCircleShadow: {
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  roleText: {
-    flex: 1,
-    gap: 3,
-  },
-  roleLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: C.text,
-  },
-  roleDescription: {
-    fontSize: 13,
-    color: C.textFaint,
-    lineHeight: 18,
-  },
+  cardText: { flex: 1, gap: 2 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: C.text },
+  cardDesc: { fontSize: 13, lineHeight: 18, color: C.textSoft },
   previewBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: C.background,
-    marginRight: 2,
   },
-  previewHintRow: {
+  infoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 18,
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.md,
   },
-  previewHint: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.55)',
-    textAlign: 'center',
-  },
+  infoText: { flex: 1, fontSize: 13, lineHeight: 19, color: C.textSoft },
 });

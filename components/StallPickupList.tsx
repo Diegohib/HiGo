@@ -16,7 +16,7 @@ import {
 // (ruta directa). Con `canPick`, cada puesto trae su botón "Retirado".
 // `renderEmpty` se muestra si el pedido no tiene tickets (pedidos viejos).
 
-const ACCENT = '#3D1F8B';
+const ACCENT = '#5B2BD9';
 
 const STATUS_META: Record<StallTicketStatus, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
   pendiente: { label: 'Preparando', icon: 'time-outline' },
@@ -84,7 +84,7 @@ function StallRow({ ticket, canPick }: { ticket: StallTicket; canPick: boolean }
               await marcarRetirado(ticket);
             } catch (err) {
               console.error('[StallPickupList] retirar:', err);
-              Alert.alert('Error', 'No se pudo marcar como retirado. Intentá de nuevo.');
+              Alert.alert('Error', 'No se pudo marcar como retirado. Intenta de nuevo.');
             } finally {
               setBusy(false);
             }

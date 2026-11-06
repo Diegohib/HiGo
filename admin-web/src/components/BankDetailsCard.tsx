@@ -36,7 +36,7 @@ export default function BankDetailsCard() {
 
   async function handleSave() {
     if (FIELDS.some((f) => !form[f.key].trim())) {
-      alert('Completá todos los datos de la cuenta.');
+      alert('Completa todos los datos de la cuenta.');
       return;
     }
     setSaving(true);

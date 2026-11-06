@@ -93,7 +93,7 @@ export default function CheckoutScreen() {
   async function pickReceipt() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permiso necesario', 'Activá el acceso a tus fotos para subir el comprobante.');
+      Alert.alert('Permiso necesario', 'Activa el acceso a tus fotos para subir el comprobante.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
@@ -144,29 +144,29 @@ export default function CheckoutScreen() {
     if (agotados.length > 0) {
       Alert.alert(
         'Hay productos agotados',
-        `${agotados.map(p => p.name).join(', ')} se agotó por hoy. Quitalo del carrito para seguir.`
+        `${agotados.map(p => p.name).join(', ')} se agotó por hoy. Quítalo del carrito para seguir.`
       );
       return;
     }
     if (total < MINIMUM_ORDER) {
       Alert.alert(
         'Pedido mínimo no alcanzado',
-        `El total debe ser al menos $${MINIMUM_ORDER.toFixed(2)}. Volvé al carrito para agregar más productos.`
+        `El total debe ser al menos $${MINIMUM_ORDER.toFixed(2)}. Vuelve al carrito para agregar más productos.`
       );
       return;
     }
 
     if (paymentMethod === 'efectivo' && total > CASH_LIMIT) {
-      Alert.alert('Efectivo no disponible', `El pago en efectivo es solo para pedidos de hasta ${CASH_LIMIT}. Elegí transferencia.`);
+      Alert.alert('Efectivo no disponible', `El pago en efectivo es solo para pedidos de hasta ${CASH_LIMIT}. Elige transferencia.`);
       return;
     }
     if (paymentMethod === 'transferencia') {
       if (!bank) {
-        Alert.alert('Transferencia no disponible', 'Todavía no hay una cuenta bancaria configurada. Elegí otra forma de pago.');
+        Alert.alert('Transferencia no disponible', 'Todavía no hay una cuenta bancaria configurada. Elige otra forma de pago.');
         return;
       }
       if (paymentRef.trim().length < 4) {
-        Alert.alert('Falta el comprobante', 'Escribí el número de comprobante de tu transferencia.');
+        Alert.alert('Falta el comprobante', 'Escribe el número de comprobante de tu transferencia.');
         return;
       }
     }
@@ -222,7 +222,7 @@ export default function CheckoutScreen() {
       clearCart();
       navigation.navigate('OrderTracking', { orderId });
     } catch {
-      Alert.alert('No se pudo confirmar el pedido', 'Revisá tu conexión e intentá de nuevo.');
+      Alert.alert('No se pudo confirmar el pedido', 'Revisa tu conexión e intenta de nuevo.');
     } finally {
       setConfirming(false);
     }

@@ -69,8 +69,8 @@ const ROLE_CONFIG: Record<StaffRole, RoleConfig> = {
     label: 'Cochero',
     icon: '🚲',
     ionIcon: 'bicycle',
-    gradient: ['#3D1F8B', '#2D1570'],
-    color: '#3D1F8B',
+    gradient: ['#7B4BF5', '#5B2BD9'],
+    color: '#5B2BD9',
     accentColor: '#B8A6E8',
     extraFields: [
       { type: 'text', key: 'cedula',   placeholder: 'Número de cédula (10 dígitos)', icon: 'card-outline',    keyboardType: 'number-pad', maxLength: 10 },
@@ -85,8 +85,8 @@ const ROLE_CONFIG: Record<StaffRole, RoleConfig> = {
     label: 'Transportista',
     icon: '🚚',
     ionIcon: 'car',
-    gradient: ['#3D1F8B', '#2D1570'],
-    color: '#3D1F8B',
+    gradient: ['#7B4BF5', '#5B2BD9'],
+    color: '#5B2BD9',
     accentColor: '#B8A6E8',
     extraFields: [
       { type: 'text', key: 'cedula',   placeholder: 'Número de cédula (10 dígitos)', icon: 'card-outline', keyboardType: 'number-pad', maxLength: 10 },
@@ -103,8 +103,8 @@ const ROLE_CONFIG: Record<StaffRole, RoleConfig> = {
     label: 'Comerciante',
     icon: '🏪',
     ionIcon: 'storefront',
-    gradient: ['#3D1F8B', '#2D1570'],
-    color: '#3D1F8B',
+    gradient: ['#7B4BF5', '#5B2BD9'],
+    color: '#5B2BD9',
     accentColor: '#B8A6E8',
     extraFields: [
       { type: 'text',   key: 'cedula',      placeholder: 'Número de cédula (10 dígitos)',  icon: 'card-outline',       keyboardType: 'number-pad', maxLength: 10 },
@@ -136,9 +136,9 @@ const FIELD_LABELS: Record<string, string> = {
 
 // Bajada del encabezado según el rol.
 const ROLE_TAGLINE: Record<StaffRole, string> = {
-  cochero:       'Recogé los pedidos en los puestos del mercado.',
-  transportista: 'Llevá los pedidos del mercado a cada cliente.',
-  comerciante:   'Recibí pedidos para tu puesto del mercado.',
+  cochero:       'Recoge los pedidos en los puestos del mercado.',
+  transportista: 'Lleva los pedidos del mercado a cada cliente.',
+  comerciante:   'Recibe pedidos para tu puesto del mercado.',
 };
 
 // ─── Componente: título de sección ────────────────────────────────────────────
@@ -188,7 +188,7 @@ function PhotoUploadButton({
       <View style={{ flex: 1 }}>
         <Text style={styles.photoLabel}>{label.replace('Subir ', '').replace(/^./, (c) => c.toUpperCase())}</Text>
         <Text style={[styles.photoStatus, uploaded && { color: C.success }]}>
-          {uploaded ? 'Cargada · tocá para cambiar' : 'Tocá para subir'}
+          {uploaded ? 'Cargada · toca para cambiar' : 'Toca para subir'}
         </Text>
       </View>
       <Ionicons
@@ -275,7 +275,7 @@ export default function StaffRegisterScreen({ navigation, route }: Props) {
   async function pickFromCamera(key: PhotoUploadKey) {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permiso necesario', 'Activá el acceso a la cámara para tomar la foto.');
+      Alert.alert('Permiso necesario', 'Activa el acceso a la cámara para tomar la foto.');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.6, allowsEditing: true });
@@ -287,7 +287,7 @@ export default function StaffRegisterScreen({ navigation, route }: Props) {
   async function pickFromLibrary(key: PhotoUploadKey) {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permiso necesario', 'Activá el acceso a tus fotos para elegir la imagen.');
+      Alert.alert('Permiso necesario', 'Activa el acceso a tus fotos para elegir la imagen.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, allowsEditing: true });
@@ -297,7 +297,7 @@ export default function StaffRegisterScreen({ navigation, route }: Props) {
   }
 
   function pickPhoto(key: PhotoUploadKey) {
-    Alert.alert('Subir foto', '¿Cómo querés agregar la imagen?', [
+    Alert.alert('Subir foto', '¿Cómo quieres agregar la imagen?', [
       { text: 'Tomar foto', onPress: () => pickFromCamera(key) },
       { text: 'Elegir de galería', onPress: () => pickFromLibrary(key) },
       { text: 'Cancelar', style: 'cancel' },
@@ -319,7 +319,7 @@ export default function StaffRegisterScreen({ navigation, route }: Props) {
     }
     const edadNum = parseInt(edad, 10);
     if (!Number.isInteger(edadNum) || edadNum < 18 || edadNum > 90) {
-      Alert.alert('Edad inválida', 'Ingresá una edad entre 18 y 90 años.');
+      Alert.alert('Edad inválida', 'Ingresa una edad entre 18 y 90 años.');
       return;
     }
     if (password.length < MIN_STAFF_PASSWORD_LENGTH || !STAFF_PASSWORD_RE.test(password)) {
@@ -345,7 +345,7 @@ export default function StaffRegisterScreen({ navigation, route }: Props) {
     }
     const uploadedKeys = (Object.keys(photos) as PhotoUploadKey[]).filter((k) => photos[k]);
     if (uploadedKeys.length < config.photoUploads.length) {
-      Alert.alert('Documentos incompletos', 'Subí todos los documentos solicitados antes de enviar.');
+      Alert.alert('Documentos incompletos', 'Sube todos los documentos solicitados antes de enviar.');
       return;
     }
 
@@ -406,14 +406,14 @@ export default function StaffRegisterScreen({ navigation, route }: Props) {
       // creó la cuenta y se envió el correo de verificación.
       Alert.alert(
         '¡Solicitud enviada! 🎉',
-        `Creamos tu cuenta y te enviamos un correo de verificación a ${email.trim()}. Confirmalo y esperá la aprobación del administrador (menos de 24 horas).`
+        `Creamos tu cuenta y te enviamos un correo de verificación a ${email.trim()}. Confírmalo y espera la aprobación del administrador (menos de 24 horas).`
       );
     } catch (error: any) {
       const message =
         error?.code === 'auth/email-already-in-use' ? 'Ese correo ya está registrado.' :
         error?.code === 'auth/weak-password'         ? 'La contraseña debe tener al menos 6 caracteres.' :
         error?.code === 'auth/invalid-email'          ? 'El correo ingresado no es válido.' :
-        'No se pudo enviar la solicitud. Intentá de nuevo.';
+        'No se pudo enviar la solicitud. Intenta de nuevo.';
       Alert.alert('Error', message);
     } finally {
       setSubmitting(false);

@@ -66,7 +66,7 @@ export default function LoginPage() {
             </button>
 
             <h1 className="auth-title">Recuperar acceso</h1>
-            <p className="auth-sub">Ingresá tu correo y te mandamos un enlace para restablecer la contraseña.</p>
+            <p className="auth-sub">Ingresa tu correo y te mandamos un enlace para restablecer la contraseña.</p>
 
             <div className="field">
               <label className="label" htmlFor="reset-email">Correo electrónico</label>
@@ -92,7 +92,7 @@ export default function LoginPage() {
         ) : (
           <form className="auth-form" onSubmit={handleSubmit}>
             <h1 className="auth-title">Bienvenido de nuevo</h1>
-            <p className="auth-sub">Iniciá sesión con tu cuenta de administrador</p>
+            <p className="auth-sub">Inicia sesión con tu cuenta de administrador</p>
 
             <div className="field">
               <label className="label" htmlFor="email">Correo electrónico</label>

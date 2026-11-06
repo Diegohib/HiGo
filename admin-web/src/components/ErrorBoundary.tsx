@@ -26,7 +26,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           <div className="login-card" style={{ textAlign: 'center' }}>
             <p className="login-logo">Algo salió mal</p>
             <p className="login-sub">
-              Hubo un error inesperado en la página. Podés intentar recargar.
+              Hubo un error inesperado en la página. Puedes intentar recargar.
             </p>
             <button className="btn btn-primary btn-block" onClick={() => window.location.reload()}>
               Recargar

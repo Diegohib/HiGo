@@ -10,7 +10,7 @@ function errorMessage(err: any, fallback: string): string {
   if (err?.code === 'auth/email-already-in-use') return 'Ese correo ya está en uso.';
   if (err?.code === 'auth/invalid-email') return 'El correo no es válido.';
   if (err?.code === 'auth/weak-password') return 'La contraseña debe tener al menos 6 caracteres.';
-  if (err?.code === 'auth/requires-recent-login') return 'Por seguridad, volvé a iniciar sesión e intentá de nuevo.';
+  if (err?.code === 'auth/requires-recent-login') return 'Por seguridad, vuelve a iniciar sesión e intenta de nuevo.';
   return fallback;
 }
 
@@ -141,7 +141,7 @@ export default function ProfileModal({ onClose }: { onClose: () => void }) {
               <input className="input" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required />
             </div>
             <div className="field">
-              <label className="label">Confirmá tu contraseña actual</label>
+              <label className="label">Confirma tu contraseña actual</label>
               <input className="input" type="password" value={emailPassword} onChange={(e) => setEmailPassword(e.target.value)} required />
             </div>
             {emailMsg && (

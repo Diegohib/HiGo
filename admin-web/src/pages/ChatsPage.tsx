@@ -51,7 +51,7 @@ export default function ChatsPage() {
         <div className="chat-panel">
           {!activeThread ? (
             <div className="empty-box" style={{ margin: 'auto' }}>
-              <p className="empty-title">Elegí una conversación</p>
+              <p className="empty-title">Elige una conversación</p>
             </div>
           ) : (
             <>
@@ -74,7 +74,7 @@ export default function ChatsPage() {
                   aria-label="Respuesta"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  placeholder="Escribí una respuesta…"
+                  placeholder="Escribe una respuesta…"
                 />
                 <button className="btn btn-primary btn-sm" type="submit" disabled={sending || !text.trim()}>
                   Enviar

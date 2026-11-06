@@ -3,7 +3,7 @@ import { RootStackParamList } from './types';
 
 // TEMPORAL — mientras se prueba el funcionamiento, no se exige verificar el
 // correo para entrar (así el registro de cliente entra directo, sin frenar
-// en "Confirmá tu correo"). Para volver a exigirlo, poné esto en `true`.
+// en "Confirma tu correo"). Para volver a exigirlo, poné esto en `true`.
 const REQUIRE_EMAIL_VERIFICATION = false;
 
 // A dónde va la app una vez resuelto el estado de sesión — lo usan tanto la

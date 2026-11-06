@@ -38,7 +38,7 @@ export default function VerifyEmailScreen() {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
         await refreshEmailVerified();
         if (useAuthStore.getState().emailVerified) {
-          Alert.alert('¡Correo verificado! ✅', 'Ya podés empezar a usar HiGo.');
+          Alert.alert('¡Correo verificado! ✅', 'Ya puedes empezar a usar HiGo.');
         }
       }
       appState.current = nextState;
@@ -50,7 +50,7 @@ export default function VerifyEmailScreen() {
     setResending(true);
     try {
       await resendVerificationEmail();
-      Alert.alert('Correo reenviado', 'Revisá tu bandeja de entrada (y spam) por si acaso.');
+      Alert.alert('Correo reenviado', 'Revisa tu bandeja de entrada (y spam) por si acaso.');
     } catch (error: any) {
       console.error('[VerifyEmail] resend error:', error?.code, error?.message, error);
       Alert.alert('Error', `No se pudo reenviar el correo (${error?.code ?? 'error desconocido'}).`);
@@ -64,11 +64,11 @@ export default function VerifyEmailScreen() {
     try {
       await refreshEmailVerified();
       if (useAuthStore.getState().emailVerified) {
-        Alert.alert('¡Correo verificado! ✅', 'Ya podés empezar a usar HiGo.');
+        Alert.alert('¡Correo verificado! ✅', 'Ya puedes empezar a usar HiGo.');
       } else {
         Alert.alert(
           'Todavía no está verificado',
-          'No detectamos que hayas confirmado el correo. Abrí el último enlace que te llegó y volvé a intentar.'
+          'No detectamos que hayas confirmado el correo. Abre el último enlace que te llegó y vuelve a intentar.'
         );
       }
       // Si ya quedó verificado, AppNavigator te saca de esta pantalla solo;
@@ -89,13 +89,13 @@ export default function VerifyEmailScreen() {
           <Ionicons name="mail-unread-outline" size={52} color="#F2C94C" />
         </View>
 
-        <Text style={styles.title}>Confirmá tu correo</Text>
+        <Text style={styles.title}>Confirma tu correo</Text>
         <Text style={styles.subtitle}>
           Te enviamos un enlace de verificación a{'\n'}
           <Text style={styles.email}>{user?.email ?? 'tu correo'}</Text>
         </Text>
         <Text style={styles.hint}>
-          Abrilo y tocá el enlace, después volvé acá y tocá "Ya verifiqué mi correo".
+          Ábrelo y toca el enlace, después vuelve acá y toca "Ya verifiqué mi correo".
         </Text>
 
         <TouchableOpacity

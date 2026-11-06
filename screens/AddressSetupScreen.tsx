@@ -56,7 +56,7 @@ export default function AddressSetupScreen() {
 
   async function handleSave() {
     if (!hasMapPin) {
-      Alert.alert('Falta la ubicación', 'Elegí tu ubicación en el mapa antes de guardar.');
+      Alert.alert('Falta la ubicación', 'Elige tu ubicación en el mapa antes de guardar.');
       return;
     }
     setSaving(true);
@@ -71,7 +71,7 @@ export default function AddressSetupScreen() {
       navigation.goBack();
     } catch (error: any) {
       console.error('[AddressSetup] save error:', error?.code, error?.message);
-      Alert.alert('Error', 'No se pudo guardar la dirección. Intentá de nuevo.');
+      Alert.alert('Error', 'No se pudo guardar la dirección. Intenta de nuevo.');
     } finally {
       setSaving(false);
     }
@@ -93,7 +93,7 @@ export default function AddressSetupScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Tu dirección de entrega</Text>
         <Text style={styles.headerSub}>
-          Guardala una vez y la próxima vez que pidas ya va a estar lista — igual vas a poder elegir otra ubicación para un pedido puntual.
+          Guárdala una vez y la próxima vez que pidas ya va a estar lista — igual vas a poder elegir otra ubicación para un pedido puntual.
         </Text>
       </View>
 
@@ -122,7 +122,7 @@ export default function AddressSetupScreen() {
               ) : (
                 <>
                   <Text style={styles.mapBtnLabel}>Elegir ubicación en el mapa</Text>
-                  <Text style={styles.mapBtnSub}>Tocá para abrir el mapa</Text>
+                  <Text style={styles.mapBtnSub}>Toca para abrir el mapa</Text>
                 </>
               )}
             </View>

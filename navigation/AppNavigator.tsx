@@ -25,13 +25,6 @@ import OrderChatScreen                from '../screens/OrderChatScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-const HEADER_OPTS = {
-  headerStyle: { backgroundColor: '#3D1F8B' },
-  headerTintColor: '#FFFFFF',
-  headerTitleStyle: { fontFamily: 'Poppins_700Bold', fontSize: 18 },
-  headerBackTitleVisible: false,
-};
-
 export default function AppNavigator() {
   const user               = useAuthStore((s) => s.user);
   const initializing       = useAuthStore((s) => s.initializing);
@@ -103,7 +96,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="RoleSelection"
           component={RoleSelectionScreen}
-          options={{ ...HEADER_OPTS, headerShown: true, title: 'Elegir rol' }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="StaffRegister"

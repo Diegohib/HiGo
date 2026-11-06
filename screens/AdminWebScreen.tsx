@@ -23,10 +23,10 @@ export default function AdminWebScreen() {
   return (
     <AuthScreen
       eyebrow="Administración"
-      title="Usá el panel web"
+      title="Usa el panel web"
       subtitle="Pagos, solicitudes, catálogo y finanzas se manejan desde la computadora."
     >
-      <AuthNotice text={`Abrí ${ADMIN_WEB_URL} e iniciá sesión con esta misma cuenta.`} />
+      <AuthNotice text={`Abre ${ADMIN_WEB_URL} e inicia sesión con esta misma cuenta.`} />
       <AuthPrimaryButton label="Abrir panel web" loading={false} onPress={() => Linking.openURL(ADMIN_WEB_URL)} />
       <AuthSecondaryButton label={leaving ? 'Cerrando…' : 'Cerrar sesión'} icon="log-out-outline" onPress={handleLogout} />
     </AuthScreen>

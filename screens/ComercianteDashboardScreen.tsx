@@ -29,6 +29,7 @@ import { cardShadow, floatingShadow } from '../theme/elevation';
 import { ThemeColors } from '../theme/colors';
 import { pickAvatarPhoto } from '../lib/pickAvatarPhoto';
 import Avatar from '../components/Avatar';
+import StaffHeader from '../components/StaffHeader';
 import AppearanceSelector from '../components/AppearanceSelector';
 import { formatShortDate, isToday } from '../utils/earnings';
 import { shortName } from '../utils/name';
@@ -41,8 +42,8 @@ type Tab = 'pedidos' | 'ganancias' | 'perfil';
 
 // Morado de marca de la app: color de este dashboard (fijo en ambos temas,
 // igual que en Cochero y Transportista — los 3 comparten identidad).
-const HEADER  = '#3D1F8B';
-const HEADER2 = '#2D1570';
+const HEADER  = '#5B2BD9';
+const HEADER2 = '#3D1F8B';
 
 // ─── Entrada animada (fade + rise) reutilizada por cada tab ───────────────────
 
@@ -161,7 +162,7 @@ function DespachosTab() {
           text: 'Sí, está listo',
           onPress: () => marcarListo(ticket.id).catch((err) => {
             console.error('[ComercianteDashboard] marcar listo:', err);
-            Alert.alert('Error', 'No se pudo marcar como listo. Intentá de nuevo.');
+            Alert.alert('Error', 'No se pudo marcar como listo. Intenta de nuevo.');
           }),
         },
       ],
@@ -515,7 +516,7 @@ function ChangePhoneModal({ currentPhone, onClose }: { currentPhone: string; onC
   async function handleSave() {
     const trimmed = newPhone.trim();
     if (!trimmed || !password) {
-      Alert.alert('Faltan datos', 'Ingresá el nuevo teléfono y tu contraseña actual.');
+      Alert.alert('Faltan datos', 'Ingresa el nuevo teléfono y tu contraseña actual.');
       return;
     }
     if (trimmed === currentPhone) {
@@ -532,7 +533,7 @@ function ChangePhoneModal({ currentPhone, onClose }: { currentPhone: string; onC
       const message =
         code === 'auth/wrong-password' || code === 'auth/invalid-credential'
           ? 'La contraseña actual no es correcta.'
-          : 'No se pudo actualizar el teléfono. Intentá de nuevo.';
+          : 'No se pudo actualizar el teléfono. Intenta de nuevo.';
       Alert.alert('Error', message);
     } finally {
       setSaving(false);
@@ -692,7 +693,7 @@ export default function ComercianteDashboardScreen({ navigation }: Props) {
   const merchantStall = user?.stallNumber ? `Puesto #${user.stallNumber}` : 'Puesto sin asignar';
 
   function handleLogout() {
-    Alert.alert('Cerrar sesión', '¿Seguro que querés salir?', [
+    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Salir', style: 'destructive', onPress: () => {
         useAuthStore.getState().logout();
@@ -706,33 +707,13 @@ export default function ComercianteDashboardScreen({ navigation }: Props) {
       <StatusBar barStyle="light-content" />
 
       {/* ── Header ── */}
-      <LinearGradient colors={[HEADER, HEADER2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
-        <View style={styles.headerBlob} pointerEvents="none" />
-        <View style={styles.headerRing} pointerEvents="none" />
-        <FadeIn style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <View style={styles.headerAvatarRing}>
-              <Avatar name={user?.name ?? merchantName} photoUri={user?.photoUri} size={46} />
-            </View>
-            <View style={{ flexShrink: 1 }}>
-              <View style={styles.headerGreetingRow}>
-                <Ionicons name="storefront" size={11} color="rgba(255,255,255,0.7)" />
-                <Text style={styles.headerGreeting}>Hola,</Text>
-              </View>
-              <Text style={styles.headerName} numberOfLines={1}>{user ? shortName(user) : merchantName}</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={[styles.disponibleBadge, !disponible && styles.noDisponibleBadge]}
-            activeOpacity={0.8}
-            onPress={toggleDisponible}
-          >
-            <View style={[styles.disponibleDot, !disponible && styles.noDisponibleDot]} />
-            <Text style={[styles.disponibleText, !disponible && styles.noDisponibleText]}>
-              {disponible ? 'Disponible' : 'No disponible'}
-            </Text>
-          </TouchableOpacity>
-        </FadeIn>
+      <StaffHeader
+        name={user ? shortName(user) : merchantName}
+        photoUri={user?.photoUri}
+        roleLabel={user?.stallNumber ? `Comerciante · Puesto ${user.stallNumber}` : 'Comerciante'}
+        available={disponible}
+        onToggleAvailable={toggleDisponible}
+      >
 
         {/* Tarjeta flotante de pedidos pendientes, superpuesta al borde del header */}
         {pendienteCount > 0 && activeTab === 'pedidos' && (
@@ -746,7 +727,7 @@ export default function ComercianteDashboardScreen({ navigation }: Props) {
             <Ionicons name="chevron-forward" size={16} color={T.textFaint} />
           </View>
         )}
-      </LinearGradient>
+      </StaffHeader>
 
       {/* ── Contenido ── */}
       <View style={styles.body}>
@@ -791,46 +772,6 @@ export default function ComercianteDashboardScreen({ navigation }: Props) {
 
 const makeStyles = (T: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.background },
-
-  header: {
-    paddingTop: 52,
-    paddingHorizontal: 18,
-    paddingBottom: 22,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    overflow: 'hidden',
-  },
-  headerBlob: {
-    position: 'absolute', top: -70, right: -50,
-    width: 190, height: 190, borderRadius: 95,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
-  headerRing: {
-    position: 'absolute', bottom: -34, left: -30,
-    width: 110, height: 110, borderRadius: 55,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 },
-  headerAvatarRing: {
-    padding: 2.5, borderRadius: 26,
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
-  },
-  headerGreetingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  headerGreeting: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  headerName:     { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
-
-  disponibleBadge:   { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(46,204,113,0.2)', borderWidth: 1, borderColor: 'rgba(46,204,113,0.5)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
-  noDisponibleBadge: { backgroundColor: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.3)' },
-  disponibleDot:     { width: 8, height: 8, borderRadius: 4, backgroundColor: '#2ECC71' },
-  noDisponibleDot:   { backgroundColor: 'rgba(255,255,255,0.5)' },
-  disponibleText:    { fontSize: 13, fontWeight: '700', color: '#2ECC71' },
-  noDisponibleText:  { color: 'rgba(255,255,255,0.6)' },
 
   floatingAlert: {
     flexDirection: 'row', alignItems: 'center', gap: 10,

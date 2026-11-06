@@ -31,7 +31,7 @@ export default function PedidosPage() {
       await cancelarPedido(o.id);
     } catch (err) {
       console.error('[PedidosPage] cancelar:', err);
-      alert('No se pudo cancelar el pedido. Intentá de nuevo.');
+      alert('No se pudo cancelar el pedido. Intenta de nuevo.');
     } finally {
       setBusy(null);
     }
@@ -44,7 +44,7 @@ export default function PedidosPage() {
       await marcarReembolsado(o.id);
     } catch (err) {
       console.error('[PedidosPage] reembolso:', err);
-      alert('No se pudo guardar. Intentá de nuevo.');
+      alert('No se pudo guardar. Intenta de nuevo.');
     } finally {
       setBusy(null);
     }
@@ -52,7 +52,7 @@ export default function PedidosPage() {
 
   async function handlePago(o: Order, accion: 'confirmar' | 'rechazar') {
     const msg = accion === 'confirmar'
-      ? `¿Confirmás que recibiste $${o.total.toFixed(2)}? El pedido pasa a los comerciantes y al cochero.`
+      ? `¿Confirmas que recibiste $${o.total.toFixed(2)}? El pedido pasa a los comerciantes y al cochero.`
       : '¿Rechazar este pago? El pedido queda detenido y el cliente ve que no se pudo confirmar.';
     if (!confirm(msg)) return;
     setBusy(o.id);
@@ -61,7 +61,7 @@ export default function PedidosPage() {
       else await rechazarPago(o.id);
     } catch (err) {
       console.error('[PedidosPage] pago:', err);
-      alert('No se pudo actualizar el pago. Intentá de nuevo.');
+      alert('No se pudo actualizar el pago. Intenta de nuevo.');
     } finally {
       setBusy(null);
     }

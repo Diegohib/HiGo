@@ -44,7 +44,7 @@ export default function PaymentMethodSection({
         active={method === 'transferencia'}
         icon="swap-horizontal-outline"
         title="Transferencia bancaria"
-        subtitle="Subís el comprobante y lo confirmamos"
+        subtitle="Subes el comprobante y lo confirmamos"
         onPress={() => onMethodChange('transferencia')}
       />
 
@@ -54,7 +54,7 @@ export default function PaymentMethodSection({
             <ActivityIndicator color={C.primary} />
           ) : bank ? (
             <>
-              <Text style={s.transferHint}>Transferí el total a esta cuenta:</Text>
+              <Text style={s.transferHint}>Transfiere el total a esta cuenta:</Text>
               <BankRow C={C} label="Banco" value={bank.bankName} />
               <BankRow C={C} label="Tipo" value={bank.accountType} />
               <BankRow C={C} label="Número" value={bank.accountNumber} strong />
@@ -90,7 +90,7 @@ export default function PaymentMethodSection({
                 <View style={{ flex: 1 }}>
                   <Text style={s.receiptTitle}>Foto del comprobante (opcional)</Text>
                   <Text style={[s.receiptSub, receiptUri && { color: C.success }]}>
-                    {receiptUri ? 'Cargada · tocá para cambiar' : 'Ayuda a confirmarlo más rápido'}
+                    {receiptUri ? 'Cargada · toca para cambiar' : 'Ayuda a confirmarlo más rápido'}
                   </Text>
                 </View>
                 <Ionicons
@@ -111,7 +111,7 @@ export default function PaymentMethodSection({
             <View style={s.infoRow}>
               <Ionicons name="alert-circle-outline" size={16} color={C.danger} />
               <Text style={s.infoText}>
-                Todavía no hay una cuenta bancaria configurada. Elegí otra forma de pago o escribinos por el chat.
+                Todavía no hay una cuenta bancaria configurada. Elige otra forma de pago o escríbenos por el chat.
               </Text>
             </View>
           )}
@@ -125,7 +125,7 @@ export default function PaymentMethodSection({
         icon="cash-outline"
         title="Efectivo contra entrega"
         subtitle={cashAllowed
-          ? 'Pagás al transportista cuando recibís'
+          ? 'Pagas al transportista cuando recibes'
           : `Solo para pedidos de hasta $${CASH_LIMIT}`}
         onPress={() => cashAllowed && onMethodChange('efectivo')}
       />
@@ -134,7 +134,7 @@ export default function PaymentMethodSection({
         <View style={s.infoRow}>
           <Ionicons name="information-circle-outline" size={14} color={C.textSoft} />
           <Text style={s.infoText}>
-            Tené listos ${total.toFixed(2)}. Si podés, con el monto justo.
+            Ten listos ${total.toFixed(2)}. Si puedes, con el monto justo.
           </Text>
         </View>
       )}

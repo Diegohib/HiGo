@@ -77,7 +77,7 @@ export default function ChatScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Ayuda / Soporte</Text>
-          <Text style={styles.headerSubtitle}>Escribinos por cualquier consulta</Text>
+          <Text style={styles.headerSubtitle}>Escríbenos por cualquier consulta</Text>
         </View>
         <View style={{ width: 40 }} />
       </LinearGradient>
@@ -97,7 +97,7 @@ export default function ChatScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="chatbubbles-outline" size={40} color={C.textFaint} />
               <Text style={styles.emptyText}>
-                Escribí tu consulta y un administrador te va a responder acá.
+                Escribe tu consulta y un administrador te va a responder acá.
               </Text>
             </View>
           ) : (
@@ -126,7 +126,7 @@ export default function ChatScreen() {
             style={styles.input}
             value={text}
             onChangeText={setText}
-            placeholder="Escribí tu mensaje…"
+            placeholder="Escribe tu mensaje…"
             placeholderTextColor={C.textFaint}
             multiline
           />

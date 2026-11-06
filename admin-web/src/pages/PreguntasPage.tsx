@@ -31,7 +31,7 @@ export default function PreguntasPage() {
       {loaded && faqs.length === 0 ? (
         <div className="empty-box">
           <p className="empty-title">Todavía no hay preguntas frecuentes</p>
-          <p>Importá las preguntas iniciales para que el Asistente HiGo pueda responderlas.</p>
+          <p>Importa las preguntas iniciales para que el Asistente HiGo pueda responderlas.</p>
           <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleSeed} disabled={seeding}>
             {seeding ? 'Importando…' : 'Importar preguntas frecuentes'}
           </button>

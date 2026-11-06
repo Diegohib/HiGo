@@ -262,7 +262,7 @@ export default function AssistantScreen() {
               style={styles.input}
               value={text}
               onChangeText={setText}
-              placeholder="Escribí tu pregunta…"
+              placeholder="Escribe tu pregunta…"
               placeholderTextColor={C.textFaint}
               multiline
               onSubmitEditing={() => ask(text)}
@@ -291,7 +291,7 @@ export default function AssistantScreen() {
           onPress={() => navigation.navigate('Chat')}
         >
           <Ionicons name="person-circle-outline" size={14} color={C.textFaint} />
-          <Text style={styles.footerLinkText}>¿Preferís hablar directo con un administrador?</Text>
+          <Text style={styles.footerLinkText}>¿Prefieres hablar directo con un administrador?</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>

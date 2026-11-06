@@ -95,7 +95,7 @@ export default function AccountScreen() {
     order.items.forEach((item) => addItem(item));
     Alert.alert(
       '¡Agregado al carrito! 🛒',
-      `Se agregaron ${order.items.length} producto${order.items.length !== 1 ? 's' : ''} de este pedido a tu carrito. Andá a la pestaña Inicio para verlo.`
+      `Se agregaron ${order.items.length} producto${order.items.length !== 1 ? 's' : ''} de este pedido a tu carrito. Ve a la pestaña Inicio para verlo.`
     );
   }
 
@@ -402,7 +402,7 @@ function EditProfileModal({
 
   function handleSavePress() {
     if (!firstName.trim() || !phone.trim()) {
-      Alert.alert('Faltan datos', 'Completá tu nombre y tu número de teléfono.');
+      Alert.alert('Faltan datos', 'Completa tu nombre y tu número de teléfono.');
       return;
     }
     Alert.alert('Confirmar cambios', '¿Guardar los cambios en tus datos personales?', [
@@ -425,7 +425,7 @@ function EditProfileModal({
       onClose();
     } catch (error: any) {
       console.error('[AccountScreen] updateProfile error:', error?.code, error?.message);
-      Alert.alert('Error', 'No se pudieron guardar los cambios. Intentá de nuevo.');
+      Alert.alert('Error', 'No se pudieron guardar los cambios. Intenta de nuevo.');
     } finally {
       setSaving(false);
     }
@@ -546,7 +546,7 @@ function ChangeEmailModal({ currentEmail, onClose }: { currentEmail: string; onC
   async function handleSave() {
     const trimmedEmail = newEmail.trim();
     if (!trimmedEmail || !password) {
-      Alert.alert('Faltan datos', 'Ingresá el nuevo correo y tu contraseña actual.');
+      Alert.alert('Faltan datos', 'Ingresa el nuevo correo y tu contraseña actual.');
       return;
     }
     if (trimmedEmail.toLowerCase() === currentEmail.toLowerCase()) {
@@ -557,7 +557,7 @@ function ChangeEmailModal({ currentEmail, onClose }: { currentEmail: string; onC
     try {
       await changeEmail(trimmedEmail, password);
       Alert.alert(
-        'Revisá tu correo',
+        'Revisa tu correo',
         `Te enviamos un enlace de confirmación a ${trimmedEmail}. Tu correo va a cambiar recién cuando lo confirmes.`
       );
       onClose();
@@ -570,7 +570,7 @@ function ChangeEmailModal({ currentEmail, onClose }: { currentEmail: string; onC
           ? 'Ese correo ya está en uso por otra cuenta.'
           : code === 'auth/invalid-email'
           ? 'El correo ingresado no es válido.'
-          : 'No se pudo actualizar el correo. Intentá de nuevo.';
+          : 'No se pudo actualizar el correo. Intenta de nuevo.';
       Alert.alert('Error', message);
     } finally {
       setSaving(false);
@@ -649,7 +649,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
   async function handleSave() {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Faltan datos', 'Completá los tres campos.');
+      Alert.alert('Faltan datos', 'Completa los tres campos.');
       return;
     }
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
@@ -672,7 +672,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
           ? 'La contraseña actual no es correcta.'
           : code === 'auth/weak-password'
           ? 'La nueva contraseña es muy débil.'
-          : 'No se pudo actualizar la contraseña. Intentá de nuevo.';
+          : 'No se pudo actualizar la contraseña. Intenta de nuevo.';
       Alert.alert('Error', message);
     } finally {
       setSaving(false);
@@ -728,7 +728,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
             style={styles.modalInput}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
-            placeholder="Repetí la nueva contraseña"
+            placeholder="Repite la nueva contraseña"
             placeholderTextColor={C.sub}
             secureTextEntry={!showNew}
           />

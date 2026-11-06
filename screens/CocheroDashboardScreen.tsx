@@ -5,13 +5,11 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Alert,
 } from 'react-native';
 import Text from '../components/Text';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
 import { useCocheroTicketStore, Ticket } from '../store/cocheroTicketStore';
@@ -23,6 +21,9 @@ import { useThemeColors } from '../theme/useThemeColors';
 import { cardShadow, floatingShadow } from '../theme/elevation';
 import { pickAvatarPhoto } from '../lib/pickAvatarPhoto';
 import Avatar from '../components/Avatar';
+import StaffHeader, { STAFF_HEADER_TOP } from '../components/StaffHeader';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { shortName } from '../utils/name';
 import StallPickupList from '../components/StallPickupList';
 import { useOrderStallTickets } from '../store/stallTicketsStore';
 import AppearanceSelector from '../components/AppearanceSelector';
@@ -36,8 +37,8 @@ import { EARNING_TIERS, calcEarning, nextPayFriday, formatShortDate } from '../u
 function useScreenColors() {
   const T = useThemeColors();
   return {
-    header:      '#3D1F8B',
-    headerDark:  '#2D1570',
+    header:      '#5B2BD9',
+    headerDark:  '#3D1F8B',
     headerFaint: T.primaryFaint,
     green:       '#2ECC71',
     greenDark:   '#27AE60',
@@ -53,7 +54,7 @@ function useScreenColors() {
     textMid:     T.textSoft,
     textSoft:    T.textFaint,
     border:      T.border,
-    tabActive:   '#3D1F8B',
+    tabActive:   '#5B2BD9',
     tabInactive: T.textFaint,
   };
 }
@@ -100,30 +101,17 @@ export default function CocheroDashboardScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.headerDark} />
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <StatusBar barStyle="light-content" backgroundColor={STAFF_HEADER_TOP} />
 
       {/* ── Header ── */}
-      <LinearGradient colors={[C.header, C.headerDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Avatar name={user?.name ?? 'Cochero'} photoUri={user?.photoUri} size={46} />
-          <View>
-            <Text style={styles.headerGreeting}>Hola,</Text>
-            <Text style={styles.headerName}>{user?.name ?? 'Cochero'}</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.disponibleBadge, !disponible && styles.noDisponibleBadge]}
-          activeOpacity={0.8}
-          onPress={() => setDisponible((v) => !v)}
-        >
-          <View style={[styles.disponibleDot, !disponible && styles.noDisponibleDot]} />
-          <Text style={[styles.disponibleText, !disponible && styles.noDisponibleText]}>
-            {disponible ? 'Disponible' : 'No disponible'}
-          </Text>
-        </TouchableOpacity>
-      </LinearGradient>
+      <StaffHeader
+        name={user ? shortName(user) : 'Cochero'}
+        photoUri={user?.photoUri}
+        roleLabel="Cochero"
+        available={disponible}
+        onToggleAvailable={() => setDisponible((v) => !v)}
+      />
 
       {/* ── Contenido por tab ── */}
       <View style={styles.body}>
@@ -598,74 +586,7 @@ function TabBarItem({
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const makeStyles = (C: ScreenColors) => StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.header },
-
-  // ── Header
-  header: {
-    backgroundColor: C.header,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 18,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatarCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarEmoji: { fontSize: 22 },
-  headerGreeting: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '500',
-  },
-  headerName: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: C.white,
-  },
-  disponibleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(46,204,113,0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(46,204,113,0.5)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  noDisponibleBadge: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  disponibleDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: C.greenDark,
-  },
-  noDisponibleDot: {
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  disponibleText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: C.greenDark,
-  },
-  noDisponibleText: {
-    color: 'rgba(255,255,255,0.6)',
-  },
+  safe: { flex: 1, backgroundColor: C.bg },
 
   // ── Body
   body: { flex: 1, backgroundColor: C.bg },

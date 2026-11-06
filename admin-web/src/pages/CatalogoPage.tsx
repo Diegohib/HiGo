@@ -73,7 +73,7 @@ export default function CatalogoPage() {
 
   async function handleDeleteCategory(c: Category) {
     if (products.some((p) => p.categoryId === c.id)) {
-      alert('Hay productos usando esta categoría. Cambialos de categoría o eliminalos primero.');
+      alert('Hay productos usando esta categoría. Cámbialos de categoría o elimínalos primero.');
       return;
     }
     if (!confirm(`¿Eliminar "${c.name}"?`)) return;
@@ -135,7 +135,7 @@ export default function CatalogoPage() {
       {empty ? (
         <div className="empty-box">
           <p className="empty-title">Todavía no hay catálogo cargado</p>
-          <p>Importá el catálogo inicial para empezar — después vas a poder editar, agregar y borrar productos desde acá.</p>
+          <p>Importa el catálogo inicial para empezar — después vas a poder editar, agregar y borrar productos desde acá.</p>
           <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleSeed} disabled={seeding}>
             {seeding ? 'Importando…' : 'Importar catálogo inicial'}
           </button>
@@ -262,7 +262,7 @@ function ProductModal({
 
   async function handleSave() {
     if (!name.trim() || !categoryId || !image.trim() || presentations.length === 0 || presentations.some((p) => !p.label.trim())) {
-      alert('Completá nombre, categoría, foto y al menos una presentación con su unidad.');
+      alert('Completa nombre, categoría, foto y al menos una presentación con su unidad.');
       return;
     }
     setSaving(true);
@@ -341,7 +341,7 @@ function ProductModal({
           </select>
           {comerciantes.length === 0 && (
             <p style={{ color: 'var(--text-faint)', fontSize: 12.5, marginTop: 6 }}>
-              Todavía no hay comerciantes aprobados. Aprobalos en Solicitudes para poder asignarles productos.
+              Todavía no hay comerciantes aprobados. Apruébalos en Solicitudes para poder asignarles productos.
             </p>
           )}
         </div>
@@ -401,7 +401,7 @@ function CategoryModal({
 
   async function handleSave() {
     if (!name.trim() || !image.trim()) {
-      alert('Completá nombre y foto.');
+      alert('Completa nombre y foto.');
       return;
     }
     setSaving(true);

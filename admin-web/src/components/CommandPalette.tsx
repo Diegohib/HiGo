@@ -118,7 +118,7 @@ export default function CommandPalette() {
 
             <div className="cmdk-results">
               {!hasQuery && (
-                <p className="cmdk-empty">Empezá a escribir para buscar en todo HiGo.</p>
+                <p className="cmdk-empty">Empieza a escribir para buscar en todo HiGo.</p>
               )}
               {hasQuery && !hasResults && (
                 <p className="cmdk-empty">Sin resultados para "{query}".</p>

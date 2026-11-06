@@ -31,7 +31,7 @@ import { RADIUS, SPACING, floatingShadow } from '../theme/elevation';
 // Morados con luz (no el morado plano y oscuro): el degradado va de un
 // violeta vivo a uno profundo, y dos brillos suaves (lila y rosado) le dan
 // profundidad sin salirse del tono de marca.
-const HERO_GRADIENT: [string, string, string] = ['#7B4BF5', '#5A2BD6', '#3D1F8B'];
+export const HERO_GRADIENT: [string, string, string] = ['#7B4BF5', '#5A2BD6', '#3D1F8B'];
 const BUTTON_GRADIENT: [string, string] = ['#8A5CFF', '#5B2BD9'];
 const BRAND      = '#5B2BD9';
 // En modo oscuro la hoja usa un morado muy profundo en vez del casi negro

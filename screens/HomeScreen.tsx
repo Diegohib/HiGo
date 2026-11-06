@@ -232,7 +232,7 @@ export default function HomeScreen({ navigation }: Props) {
             <Ionicons name="storefront-outline" size={30} color={C.primary} />
             <Text style={styles.comingSoonTitle}>Muy pronto</Text>
             <Text style={styles.comingSoonText}>
-              Estamos subiendo los productos del mercado. ¡Volvé pronto!
+              Estamos subiendo los productos del mercado. ¡Vuelve pronto!
             </Text>
           </View>
         ) : (

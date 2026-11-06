@@ -38,7 +38,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
       const message =
         err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password' || err?.code === 'auth/user-not-found'
           ? 'El correo o la contraseña no coinciden.'
-          : 'No se pudo iniciar sesión. Intentá de nuevo.';
+          : 'No se pudo iniciar sesión. Intenta de nuevo.';
       set({ error: message });
       throw err;
     }

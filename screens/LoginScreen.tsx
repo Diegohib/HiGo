@@ -35,7 +35,7 @@ export default function LoginScreen({ navigation }: Props) {
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!trimmedEmail || !password) {
-      Alert.alert('Campos incompletos', 'Ingresá tu correo y contraseña.');
+      Alert.alert('Campos incompletos', 'Ingresa tu correo y contraseña.');
       return;
     }
 
@@ -50,8 +50,8 @@ export default function LoginScreen({ navigation }: Props) {
         error?.code === 'auth/invalid-credential' || error?.code === 'auth/wrong-password' || error?.code === 'auth/user-not-found'
           ? 'El correo o la contraseña no coinciden.'
           : error?.code === 'auth/too-many-requests'
-          ? 'Demasiados intentos. Probá de nuevo en unos minutos.'
-          : 'No se pudo iniciar sesión. Intentá de nuevo.';
+          ? 'Demasiados intentos. Prueba de nuevo en unos minutos.'
+          : 'No se pudo iniciar sesión. Intenta de nuevo.';
       Alert.alert('Error al iniciar sesión', message);
     } finally {
       setLoggingIn(false);
@@ -61,7 +61,7 @@ export default function LoginScreen({ navigation }: Props) {
   async function handleReset() {
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) {
-      Alert.alert('Falta el correo', 'Ingresá tu correo para enviarte el enlace.');
+      Alert.alert('Falta el correo', 'Ingresa tu correo para enviarte el enlace.');
       return;
     }
     setResetSubmitting(true);
@@ -85,7 +85,7 @@ export default function LoginScreen({ navigation }: Props) {
   return (
     <AuthScreen
       eyebrow={resetMode ? 'Recuperar acceso' : 'Bienvenido'}
-      title={resetMode ? 'Restablecé tu contraseña' : 'Iniciá sesión'}
+      title={resetMode ? 'Restablece tu contraseña' : 'Inicia sesión'}
       subtitle={resetMode ? 'Te enviamos un enlace a tu correo.' : 'Lo mejor del Mercado Mayorista, a un toque.'}
       onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
     >

@@ -164,7 +164,7 @@ export default function MapPickerScreen() {
       {/* La punta del pin apunta al centro exacto de la pantalla */}
       <View style={styles.pinAnchor} pointerEvents="none">
         <View style={[styles.pinIcon, isDragging && styles.pinIconLifted]}>
-          <Ionicons name="location" size={46} color="#3D1F8B" />
+          <Ionicons name="location" size={46} color="#5B2BD9" />
         </View>
         <View style={[styles.pinDot, isDragging && styles.pinDotSmall]} />
       </View>

@@ -220,12 +220,11 @@ export default function CatalogScreen() {
             return (
               <TouchableOpacity
                 key={pill}
-                style={styles.tabItem}
+                style={[styles.tabItem, active && styles.tabItemActive]}
                 activeOpacity={0.7}
                 onPress={() => setActivePill(i)}
               >
                 <Text style={[styles.tabText, active && styles.tabTextActive]}>{pill}</Text>
-                {active && <View style={styles.tabUnderline} />}
               </TouchableOpacity>
             );
           })}
@@ -254,14 +253,14 @@ export default function CatalogScreen() {
               <Ionicons name="storefront-outline" size={44} color="#D4C9F5" />
               <Text style={styles.emptyTitle}>Muy pronto</Text>
               <Text style={styles.emptyText}>
-                Estamos subiendo los productos{isFiltered ? ` de ${categoryName}` : ''}. ¡Volvé pronto!
+                Estamos subiendo los productos{isFiltered ? ` de ${categoryName}` : ''}. ¡Vuelve pronto!
               </Text>
             </View>
           ) : (
             <View style={styles.empty}>
               <Ionicons name="search-outline" size={44} color="#D4C9F5" />
               <Text style={styles.emptyTitle}>Sin resultados</Text>
-              <Text style={styles.emptyText}>Intentá con otro término</Text>
+              <Text style={styles.emptyText}>Intenta con otro término</Text>
             </View>
           )
         }
@@ -368,36 +367,37 @@ const makeStyles = (C: ThemeColors) => StyleSheet.create({
     fontWeight: '800',
   },
 
-  // Tabs de subcategoría
+  // Subcategorías: chips (antes eran pestañas subrayadas que en algunas
+  // pantallas quedaban cortadas por arriba).
   tabsRow: {
     flexGrow: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    flexShrink: 0,
   },
   tabsRowContent: {
     paddingHorizontal: 16,
-    gap: 22,
+    paddingVertical: 10,
+    gap: 8,
+    alignItems: 'center',
   },
   tabItem: {
-    alignItems: 'center',
-    paddingBottom: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+  },
+  tabItemActive: {
+    borderColor: C.primary,
+    backgroundColor: C.primary,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '600',
-    color: C.textFaint,
+    color: C.textSoft,
   },
   tabTextActive: {
-    color: C.text,
-    fontWeight: '800',
-  },
-  tabUnderline: {
-    position: 'absolute',
-    bottom: -1,
-    height: 2.5,
-    width: '100%',
-    backgroundColor: C.primary,
-    borderRadius: 2,
+    color: '#FFFFFF',
   },
 
   // Encabezado de sección

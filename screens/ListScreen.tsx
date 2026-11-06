@@ -94,9 +94,9 @@ export default function ListScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="heart-outline" size={64} color="#D4C9F5" />
-            <Text style={styles.emptyTitle}>Todavía no tenés favoritos</Text>
+            <Text style={styles.emptyTitle}>Todavía no tienes favoritos</Text>
             <Text style={styles.emptyText}>
-              Tocá el corazón en cualquier producto del catálogo para guardarlo acá
+              Toca el corazón en cualquier producto del catálogo para guardarlo acá
             </Text>
           </View>
         }
